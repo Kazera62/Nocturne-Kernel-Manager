@@ -461,8 +461,9 @@ class KernelRepository(
     private fun discoverIoSchedulers(): List<IoSchedulerInfo> {
         val blockDevices = discoverDirectories(
             "/sys/block",
-            Regex("[A-Za-z0-9_.!:+-]+")
-        )
+            Regex("(mmcblk[0-9]+|sd[a-c]|nvme[0-9]+n[0-9]+)")
+        ).filter { KernelParsers.isSupportedIoDevice(it.name) }
+
         return blockDevices.mapNotNull { device ->
             val path = device.absolutePath + "/queue/scheduler"
             val content = read(path) ?: return@mapNotNull null
@@ -560,7 +561,7 @@ class KernelRepository(
             if (parts.size >= 10) {
                 val device = parts[2]
                 val isPartition = File("/sys/class/block/$device/partition").exists()
-                if (!device.startsWith("loop") && !device.startsWith("ram") && !isPartition) {
+                if (KernelParsers.isSupportedIoDevice(device) && !isPartition) {
                     sectorsRead += parts[5].toLongOrNull() ?: 0L
                     sectorsWritten += parts[9].toLongOrNull() ?: 0L
                     hasData = true
