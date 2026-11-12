@@ -38,7 +38,7 @@ class RootShell : AutoCloseable {
     private var output: BufferedWriter? = null
 
     fun detect(): RootAccess {
-        val result = execute("id", timeoutMs = 3_000)
+        val result = execute("id", timeoutMs = 8_000)
         val granted = result.success &&
             Regex("(^|\\s)uid=0(?:\\(|\\s|$)").containsMatchIn(result.output)
 
