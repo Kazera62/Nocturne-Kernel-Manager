@@ -279,11 +279,11 @@ class KernelRepository(
             read("/sys/devices/system/cpu/cpu$cpu/online")?.toIntOrNull() == 1 ||
                 (cpu == 0 && read("/sys/devices/system/cpu/cpu0/online") == null)
         }
+        val target = if (online) 1 else 0
+        if (previous == target) return ControlResult(true, "CPU$coreId is already in the requested state.")
         if (!KernelParsers.canChangeCpuOnline(coreId, online, onlineCount)) {
             return ControlResult(false, "At least two CPU cores must remain online.")
         }
-        val target = if (online) 1 else 0
-        if (previous == target) return ControlResult(true, "CPU$coreId is already in the requested state.")
         val result = rootShell.writeCpuOnline(coreId, online)
         if (!result.success) return ControlResult(false, result.error ?: "CPU hotplug write failed.")
         val verified = read(onlinePath)?.toIntOrNull()
