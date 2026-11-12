@@ -4,7 +4,7 @@ Aplikasi Android untuk memantau dan mengelola interface kernel pada Samsung Gala
 
 ## Release status
 
-**Version: 0.3.0 · Core UI and kernel integration**
+**Version: 0.4.0 · Advanced runtime controls**
 
 Aplikasi memakai model *capability-driven*: interface dicari pada perangkat yang sedang berjalan. Kontrol hanya ditampilkan saat node dan nilai yang dibutuhkan tersedia. Node yang tidak tersedia ditandai **Unsupported**, bukan diisi data contoh.
 
@@ -17,15 +17,15 @@ Target M11/A11 adalah fokus pengembangan. Seluruh varian regional, firmware, ROM
 | Root | Startup root preflight, persistent SU session, status chip, manual re-check |
 | CPU | Per-policy governor, OPP table, current/min/max frequency |
 | CPU topology | Present/online core monitoring |
-| GPU | Adreno/KGSL frequency and utilization telemetry |
-| CCI / DDR | Devfreq telemetry for interconnect and memory bus |
+| GPU | Adreno/KGSL telemetry and maximum power-level selection from the live OPP table (Advanced menu) |
+| CCI / DDR | Devfreq telemetry and exposed min/max readings (read-only) |
 | Memory | RAM, ZRAM statistics, swappiness, VFS cache pressure |
 | Kernel extras | ZRAM compression algorithm, KSM status/statistics, entropy readings |
 | Thermal | Detected thermal-zone temperatures |
 | I/O | Disk statistics; scheduler controls for whole-device `mmcblk*`, `sda`–`sdc` and `nvme*` only |
 | Network | RX/TX counters and kernel-supported TCP congestion algorithms |
 | System | Battery, storage, uptime, kernel release and dmesg |
-| Settings | English / Bahasa Indonesia and configurable refresh interval |
+| Settings | English / Bahasa Indonesia, refresh interval and default-off Advanced menu toggle |
 
 ## Application layout
 
@@ -35,8 +35,9 @@ The navigation is divided into four main areas:
 - **Performance** — CPU policy, CPU core topology, VM parameters and I/O scheduler.
 - **Monitor** — GPU/KGSL, CCI/DDR devfreq and thermal sensors.
 - **System** — battery, storage, network, TCP congestion and kernel logs.
+- **Advanced** — hidden by default; KGSL maximum OPP selection, regulator voltage telemetry and CCI/DDR status.
 
-The gear icon in the top-right opens **Settings**. Language and refresh preferences are stored locally.
+The gear icon in the top-right opens **Settings**. Language, refresh preferences and the Advanced menu toggle are stored locally. Advanced remains hidden until enabled.
 
 The layout applies dynamic status-bar, navigation-bar and display-cutout insets. Kernel telemetry and all SU commands run on a dedicated background I/O executor. Overview, Performance, Monitor and System update bound values on the next display frame rather than rebuilding the full view tree on every poll.
 
@@ -58,6 +59,7 @@ The bridge targets root managers that provide a standard SU interface, including
 | VM swappiness | 0–100 |
 | VFS cache pressure | 10–200 |
 | TCP congestion control | Selected algorithm must be present in the kernel's live available list |
+| GPU maximum OPP | Exact KGSL gpu_available_frequencies entry mapped to a valid max_pwrlevel; current min_pwrlevel and num_pwrlevels are rechecked, with read-back and rollback |
 
 These are runtime controls. The app does not guarantee that settings persist across reboot.
 
@@ -75,16 +77,24 @@ SmartPack Kernel Manager is archived and marked GPL-3.0. This project uses the r
 
 ## Safety boundaries
 
+The application exposes only a runtime GPU maximum-OPP selector using existing KGSL power levels. The control cannot add a new GPU OPP or exceed the live kernel table. Thermal power-level limits remain kernel-owned.
+
 The application does not expose:
-- GPU overclocking or GPU maximum-frequency caps;
-- voltage overrides or regulator writes;
+- GPU OPP table modification or a frequency above the live kernel table;
+- voltage overrides, regulator writes or undervolting;
 - CPR/corner scaling changes;
 - DDR/RAM overclocking;
 - thermal trip-point changes or thermal-protection bypass;
 - CPU hotplug writes in this release;
 - arbitrary shell commands from the UI.
 
-GPU, CCI/DDR, KSM, ZRAM algorithm and entropy are monitoring-only. Kernel-side Zygote DDR bandwidth boost, when provided by the running kernel, remains kernel-owned and is not recreated by app polling.
+GPU maximum-OPP selection is the only new GPU write. CCI/DDR, regulator voltage, KSM, ZRAM algorithm and entropy remain monitoring-only. Kernel-side Zygote DDR bandwidth boost, when provided by the running kernel, remains kernel-owned and is not recreated by app polling.
+
+## Advanced tuning and KonaBess
+
+Advanced is disabled by default and enabled from Settings. GPU control maps an existing KGSL OPP to the driver's max_pwrlevel index; it does not change the OPP table, write voltage, or touch thermal_pwrlevel. CPU frequency limits continue to use the live cpufreq OPP list. CCI/DDR and regulator values are shown only when readable and are not written by this release.
+
+The Qualcomm CPR/DTB voltage-corner path in the SDM450 kernel has no validated runtime undervolt interface in this app. KonaBess is a boot-image DTB modification workflow and its published device list does not include SDM450. Its source is a reference only; do not use its generated image for M11/A11.
 
 ## Build
 
