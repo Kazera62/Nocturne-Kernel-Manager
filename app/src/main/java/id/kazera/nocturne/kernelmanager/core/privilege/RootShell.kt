@@ -82,6 +82,27 @@ class RootShell : AutoCloseable {
         return writeNode("/sys/class/kgsl/kgsl-3d0/max_pwrlevel", level.toString())
     }
 
+    fun writeSchedutilTunable(policyPath: String, tunable: String, value: String): ShellResult {
+        val policyAllowed = Regex(
+            "^/sys/devices/system/cpu/(cpufreq/policy[0-9]+|cpu[0-7]/cpufreq)$"
+        ).matches(policyPath)
+        val tunableAllowed = tunable in setOf(
+            "hispeed_load", "hispeed_freq", "up_rate_limit_us", "down_rate_limit_us", "pl"
+        )
+        val valueAllowed = Regex("^[0-9]{1,10}$").matches(value) &&
+            (tunable != "pl" || value in setOf("0", "1"))
+        if (!policyAllowed || !tunableAllowed || !valueAllowed) {
+            return rejected("Rejected schedutil tunable path or value.")
+        }
+        return writeNode("$policyPath/schedutil/$tunable", value)
+    }
+
+    fun writeDynamicFsync(enabled: Boolean): ShellResult =
+        writeNode(
+            "/sys/kernel/dyn_fsync/Dyn_fsync_active",
+            if (enabled) "1" else "0"
+        )
+
     fun writeCpuOnline(coreId: Int, online: Boolean): ShellResult {
         if (coreId !in 1..7) {
             return rejected("CPU0 and unsupported CPU IDs cannot be changed.")
