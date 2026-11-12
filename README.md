@@ -126,13 +126,12 @@ app/build/outputs/apk/debug/app-debug.apk
 
 ## GitHub Actions
 
-The **Android CI** workflow is manually triggered and restricted to main:
+The **Android CI** workflow runs automatically for pushes to `main` and pull
+requests targeting `main`. It can also be started manually from
+**Actions → Android CI → Run workflow** on `main`.
 
-1. Open **Actions**.
-2. Select **Android CI**.
-3. Select **Run workflow** on main.
-
-It runs unit tests, lint and assembleDebug, then uploads the debug APK artifact for 14 days.
+It runs unit tests, lint and `assembleDebug`, then uploads the debug APK
+artifact for 14 days. Pull-request runs use read-only repository permissions.
 
 ## Documentation
 
