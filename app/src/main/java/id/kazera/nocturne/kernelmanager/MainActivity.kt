@@ -113,29 +113,36 @@ class MainActivity : Activity() {
         val baseBottom = view.paddingBottom
 
         view.setOnApplyWindowInsetsListener { target, insets ->
-            val safeInsets = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                insets.getInsets(
+            val leftInset: Int
+            val topInset: Int
+            val rightInset: Int
+            val bottomInset: Int
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                val safeInsets = insets.getInsets(
                     WindowInsets.Type.statusBars() or
                         WindowInsets.Type.navigationBars() or
                         WindowInsets.Type.displayCutout()
                 )
+                leftInset = safeInsets.left
+                topInset = safeInsets.top
+                rightInset = safeInsets.right
+                bottomInset = safeInsets.bottom
             } else {
                 @Suppress("DEPRECATION")
-                val left = insets.systemWindowInsetLeft
+                leftInset = insets.systemWindowInsetLeft
                 @Suppress("DEPRECATION")
-                val top = insets.systemWindowInsetTop
+                topInset = insets.systemWindowInsetTop
                 @Suppress("DEPRECATION")
-                val right = insets.systemWindowInsetRight
+                rightInset = insets.systemWindowInsetRight
                 @Suppress("DEPRECATION")
-                val bottom = insets.systemWindowInsetBottom
-                android.graphics.Insets.of(left, top, right, bottom)
+                bottomInset = insets.systemWindowInsetBottom
             }
 
             target.setPadding(
-                baseLeft + safeInsets.left,
-                baseTop + safeInsets.top,
-                baseRight + safeInsets.right,
-                baseBottom + safeInsets.bottom
+                baseLeft + leftInset,
+                baseTop + topInset,
+                baseRight + rightInset,
+                baseBottom + bottomInset
             )
             insets
         }
