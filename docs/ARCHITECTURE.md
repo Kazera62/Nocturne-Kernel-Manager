@@ -63,6 +63,8 @@ DeviceSnapshot contains a single sample for the UI. Nullable fields represent un
 | CPU cpufreq | /sys/devices/system/cpu/cpufreq/policy*, legacy per-CPU cpufreq | Governor and min/max from live lists only |
 | GPU | /sys/class/kgsl/kgsl-3d0/gpu_available_frequencies, max_pwrlevel, min_pwrlevel, num_pwrlevels | Maximum power-level selector using a live OPP only; thermal_pwrlevel is never written |
 | CCI / DDR | Matching /sys/class/devfreq/*/available_frequencies, min_freq, max_freq | Writes only when both bound nodes and selected live OPPs exist; path/name allowlist, ordered writes, read-back and rollback |
+| schedutil | /sys/devices/system/cpu/{policy}/schedutil/{hispeed_load,hispeed_freq,up_rate_limit_us,down_rate_limit_us} | Active schedutil policy only; range validation, live OPP validation for hispeed_freq, read-back and rollback |
+| Dynamic Fsync | /sys/kernel/dyn_fsync/Dyn_fsync_active | Exact node only; boolean 0/1, read-back and rollback; deferred writes carry data-loss risk |
 | Regulator | /sys/class/regulator/regulator*/ | Voltage/range/state telemetry only |
 | Thermal | /sys/class/thermal/thermal_zone*/ | Read-only |
 | Memory / ZRAM | /proc/meminfo, /sys/block/zram0/ | Read-only |
@@ -134,6 +136,8 @@ The Advanced menu is default-off. Its GPU control maps a selected frequency to t
 
 CPU hotplug accepts only present secondary cores 1–7; CPU0 cannot be disabled, and the repository rejects a change that would leave fewer than two cores online. CCI/DDR limits are exposed only when available_frequencies, min_freq and max_freq are all readable and the requested bounds exist in the live table. Writes are serialized, ordered to avoid invalid transient ranges, verified and rolled back best-effort.
 
+Schedutil tunables are discovered only beneath a CPU policy currently using the schedutil governor. hispeed_load is limited to 0–100, hispeed_freq must be in that policy's live OPP list, rate limits are limited to 0–1,000,000 µs, and the power-limit flag is boolean. Dynamic Fsync is exposed only when /sys/kernel/dyn_fsync/Dyn_fsync_active is readable; only 0/1 is written and read-back is verified.
+
 The SDM450 source defines Adreno 506 OPPs in DTB data. This app can select only entries exposed by the running kernel. Regulator and CPR voltage data is read-only; no validated runtime undervolt write interface is provided. CPU hotplug is limited to secondary IDs 1–7, protects CPU0 and prevents taking the device below two online cores. CCI/DDR min/max controls appear only when both writable nodes and a matching live OPP table are exposed; otherwise they remain read-only.
 
 ## Safety limits
@@ -144,6 +148,7 @@ The SDM450 source defines Adreno 506 OPPs in DTB data. This app can select only 
 - No thermal trip-point or thermal-protection writes.
 - No CPU0 hotplug; secondary CPU hotplug is restricted to IDs 1–7 and keeps at least two cores online.
 - No arbitrary shell command field in the UI.
+- Dynamic Fsync is optional and carries a data-integrity risk: deferred fsync/fdatasync writes may be lost if the device crashes or loses power while the screen is on.
 - No recreation of the kernel's Zygote DDR bandwidth boost by app polling.
 
 Future writable interfaces require a documented path allow-list, value bounds, read-back, failure handling and device testing.
