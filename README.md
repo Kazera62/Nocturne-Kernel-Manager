@@ -126,8 +126,8 @@ app/build/outputs/apk/debug/app-debug.apk
 
 ## GitHub Actions
 
-The **Android CI** workflow runs automatically for pushes to `main` and pull
-requests targeting `main`. It can also be started manually from
+The **Android CI** workflow runs automatically for every branch push and for
+pull requests targeting `main`. It can also be started manually from
 **Actions → Android CI → Run workflow** on `main`.
 
 It runs unit tests, lint and `assembleDebug`, then uploads the debug APK
