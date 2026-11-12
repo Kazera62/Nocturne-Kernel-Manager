@@ -75,6 +75,13 @@ class RootShell : AutoCloseable {
         return writeNode(path, value)
     }
 
+    fun writeGpuMaxPowerLevel(level: Int): ShellResult {
+        if (level !in 0..31) {
+            return rejected("Rejected GPU power level outside the KGSL index range.")
+        }
+        return writeNode("/sys/class/kgsl/kgsl-3d0/max_pwrlevel", level.toString())
+    }
+
     fun writeIoScheduler(path: String, value: String): ShellResult {
         val allowedPath = Regex(
             "^/sys/block/(mmcblk[0-9]+|sd[a-c]|nvme[0-9]+n[0-9]+)/queue/scheduler$"
