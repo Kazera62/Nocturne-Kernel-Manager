@@ -18,7 +18,7 @@ Target M11/A11 adalah fokus pengembangan. Seluruh varian regional, firmware, ROM
 | CPU | Per-policy governor, OPP table, current/min/max frequency |
 | CPU topology | Present/online monitoring; CPU0 protected and optional hotplug for secondary cores 1–7 |
 | GPU | Adreno/KGSL telemetry and maximum power-level selection from the live OPP table (Advanced menu) |
-| CCI / DDR | Devfreq telemetry and min/max tuning when writable nodes and live OPPs are exposed |
+| CCI / DDR | Devfreq min/max tuning only when writable nodes and matching live OPPs are exposed; otherwise read-only |
 | Memory | RAM, ZRAM statistics, swappiness, VFS cache pressure |
 | Kernel extras | ZRAM compression algorithm, KSM status/statistics, entropy readings |
 | Thermal | Detected thermal-zone temperatures |
@@ -29,7 +29,7 @@ Target M11/A11 adalah fokus pengembangan. Seluruh varian regional, firmware, ROM
 
 ## Application layout
 
-The navigation is divided into four main areas:
+Four primary sections are always visible. Advanced is added to the navigation only while its Settings toggle is ON:
 
 - **Overview** — device identity, root status and live summary.
 - **Performance** — CPU policy, CPU core topology, VM parameters and I/O scheduler.
@@ -87,14 +87,14 @@ The application does not expose:
 - CPR/corner scaling changes;
 - DDR/RAM overclocking or new devfreq OPP creation;
 - thermal trip-point changes or thermal-protection bypass;
-- CPU0 hotplug or hotplug of the final online core;
+- CPU0 hotplug or disabling cores when only two cores would not remain online;
 - arbitrary shell commands from the UI.
 
 GPU maximum-OPP selection is the only GPU write. CCI/DDR min/max limits are available only when the exact live nodes and OPPs are writable; regulator voltage, KSM, ZRAM algorithm and entropy remain monitoring-only. Kernel-side Zygote DDR bandwidth boost, when provided by the running kernel, remains kernel-owned and is not recreated by app polling.
 
 ## Advanced tuning and KonaBess
 
-Advanced is disabled by default and enabled from Settings. GPU control maps an existing KGSL OPP to the driver's max_pwrlevel index; it does not change the OPP table, write voltage, or touch thermal_pwrlevel. CPU frequency limits continue to use the live cpufreq OPP list. CCI/DDR and regulator values are shown only when readable and are not written by this release.
+Advanced is disabled by default and enabled from Settings. GPU control maps an existing KGSL OPP to the driver's max_pwrlevel index; it does not change the OPP table, write voltage, or touch thermal_pwrlevel. CPU frequency limits continue to use the live cpufreq OPP list. Secondary CPU hotplug (IDs 1–7) is available with CPU0 protected and a two-core minimum. CCI/DDR limits can be written only when the device exposes readable min_freq/max_freq nodes and the selected values match its live OPP table; otherwise the card remains telemetry-only. Regulator voltage remains read-only.
 
 The Qualcomm CPR/DTB voltage-corner path in the SDM450 kernel has no validated runtime undervolt interface in this app. KonaBess is a boot-image DTB modification workflow and its published device list does not include SDM450. Its source is a reference only; do not use its generated image for M11/A11.
 
