@@ -240,7 +240,7 @@ object UiText {
         "ABOUT" to "TENTANG",
         "Nocturne Kernel Manager" to "Nocturne Kernel Manager",
         "Target: Samsung Galaxy M11 / A11 · SDM450" to "Target: Samsung Galaxy M11 / A11 · SDM450",
-        "Version 0.2.0" to "Versi 0.2.0",
+        "Version 0.3.0" to "Versi 0.2.0",
         "Unsupported" to "Tidak didukung",
         "Unknown" to "Tidak diketahui",
         "Root permission is required to read dmesg." to "Izin root diperlukan untuk membaca dmesg.",
