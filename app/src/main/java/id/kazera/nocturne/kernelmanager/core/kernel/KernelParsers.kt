@@ -30,6 +30,20 @@ object KernelParsers {
         return result.toList()
     }
 
+    fun isAllowedKernelReadPath(path: String): Boolean =
+        !path.contains("..") && !path.contains('\u0000') &&
+            (path.startsWith("/sys/") || path.startsWith("/proc/") || path.startsWith("/vendor/"))
+
+    fun isSupportedDevfreqPath(path: String): Boolean =
+        Regex("^/sys/class/devfreq/[A-Za-z0-9_.:@,-]+$").matches(path)
+
+    fun isSupportedDevfreqName(name: String): Boolean =
+        listOf("cci", "cpubw", "bus", "ddr", "mem", "llcc")
+            .any { name.contains(it, ignoreCase = true) }
+
+    fun canChangeCpuOnline(coreId: Int, online: Boolean, onlineCount: Int): Boolean =
+        isSupportedCpuHotplugCore(coreId) && (online || onlineCount > 2)
+
     /** KGSL power levels are indexed from highest to lowest frequency. */
     fun gpuPowerLevelForFrequency(frequenciesHz: List<Long>, selectedFrequencyHz: Long): Int? =
         frequenciesHz.sortedDescending().indexOf(selectedFrequencyHz).takeIf { it >= 0 }
