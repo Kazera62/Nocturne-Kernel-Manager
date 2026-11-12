@@ -239,6 +239,8 @@ class HomeScreen(
         }
 
         addCard(container, "PROCESSOR", "Detected CPU frequency policies") {
+            val onlineCores = data.cpuCores.count { it.online == true }
+            addInfoRow(it, "Cores online", onlineCores.toString() + "/" + data.cpuCores.size)
             if (data.cpuPolicies.isEmpty()) {
                 addUnsupported(it, "CPU cpufreq policies")
             } else {
@@ -389,6 +391,25 @@ class HomeScreen(
             return
         }
         data.cpuPolicies.forEach { policy -> addCpuPolicyCard(container, data, policy) }
+        addCard(container, "CPU CORE TOPOLOGY", "Read-only core online status") { card ->
+            if (data.cpuCores.isEmpty()) {
+                addUnsupported(card, "CPU core topology")
+            } else {
+                data.cpuCores.forEach { core ->
+                    addInfoRow(
+                        card,
+                        "Core " + core.coreId,
+                        when (core.online) {
+                            true -> "Online"
+                            false -> "Offline"
+                            null -> "Unknown"
+                        }
+                    )
+                }
+            }
+            addText(card, "Core hotplug control is not enabled in this build. This page only observes the kernel state.",
+                MUTED, 11f, top = 8)
+        }
         addCard(container, "Control boundary") {
             addText(it, "Frequency values are loaded from the active kernel OPP table. The app rejects values outside that table and restores previous limits when a write fails. No voltage or regulator node is modified.",
                 SECONDARY, 12f)
