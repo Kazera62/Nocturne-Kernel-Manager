@@ -230,8 +230,8 @@ class KernelRepository(
             return ControlResult(false, "KGSL OPP list and power-level count do not match.")
         }
 
-        val selectedLevel = liveFrequencies.indexOf(selectedFrequencyHz)
-        if (selectedLevel < 0 || selectedLevel >= numberOfLevels) {
+        val selectedLevel = KernelParsers.gpuPowerLevelForFrequency(liveFrequencies, selectedFrequencyHz)
+        if (selectedLevel == null || selectedLevel >= numberOfLevels) {
             return ControlResult(false, "Selected GPU frequency is not in the live OPP table.")
         }
         if (selectedLevel > minimumLevel) {
