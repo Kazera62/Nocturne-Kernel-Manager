@@ -18,6 +18,8 @@ Fokus pengembangan:
 - Jangan mengasumsikan sysfs/procfs path tersedia di semua kernel.
 - Node yang tidak terdeteksi harus menjadi Unsupported, bukan dummy control.
 - Semua write path harus memiliki allow-list dan validasi nilai.
+- VM sysctl harus menggunakan batas swappiness 0–100 dan VFS cache pressure 10–200.
+- TCP congestion control harus dipilih hanya dari daftar algoritma yang dibaca dari kernel.
 - Jangan menambahkan GPU overclock/cap, voltage/regulator/CPR/corner writes,
   DDR overclock, atau thermal-protection bypass.
 - Jangan membuat ulang fitur kernel yang sudah berjalan secara internal melalui
