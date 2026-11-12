@@ -37,6 +37,18 @@ object KernelParsers {
     fun gpuFrequencyForPowerLevel(frequenciesHz: List<Long>, powerLevel: Int): Long? =
         frequenciesHz.sortedDescending().getOrNull(powerLevel)
 
+    fun isValidSchedutilTunable(
+        tunable: String,
+        value: Long,
+        availableCpuFrequenciesKHz: List<Long>
+    ): Boolean = when (tunable) {
+        "hispeed_load" -> value in 0L..100L
+        "hispeed_freq" -> value in availableCpuFrequenciesKHz
+        "up_rate_limit_us", "down_rate_limit_us" -> value in 0L..1_000_000L
+        "pl" -> value in 0L..1L
+        else -> false
+    }
+
     fun gpuUtilization(text: String?): Int? {
         val values = text.orEmpty().trim().split(Regex("\\s+"))
             .mapNotNull { it.toLongOrNull() }
