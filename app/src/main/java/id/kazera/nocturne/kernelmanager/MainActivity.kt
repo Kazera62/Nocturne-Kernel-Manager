@@ -89,7 +89,7 @@ class MainActivity : Activity() {
             },
             onDevfreqRangeApply = { path, minimum, maximum ->
                 applyDevfreqLimits(path, minimum, maximum)
-            }
+            },
             onSchedutilTunableApply = { policyPath, tunable, value ->
                 applySchedutilTunable(policyPath, tunable, value)
             },
