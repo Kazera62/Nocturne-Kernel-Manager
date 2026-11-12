@@ -346,15 +346,19 @@ class KernelRepository(
                 ?: read(path + "/cpuinfo_cur_freq")
             val minimum = read(path + "/scaling_min_freq")
             val maximum = read(path + "/scaling_max_freq")
-            val frequencies = KernelParsers.frequencyList(
-                read(path + "/scaling_available_frequencies")
-                    ?: read(path + "/cpuinfo_available_frequencies")
-            )
+            val frequencyText = read(path + "/scaling_available_frequencies")
+                ?.takeIf { it.isNotBlank() }
+                ?: read(path + "/cpuinfo_available_frequencies")
+            val frequencies = KernelParsers.frequencyList(frequencyText)
             val governors = read(path + "/scaling_available_governors")
                 .orEmpty().split(Regex("\\s+")).filter { it.isNotBlank() }.distinct()
             CpuPolicyInfo(
                 path = path,
-                name = directory.name,
+                name = if (directory.name == "cpufreq") {
+                    directory.parentFile?.name ?: directory.name
+                } else {
+                    directory.name
+                },
                 currentFrequencyKHz = KernelParsers.longValue(current),
                 minFrequencyKHz = KernelParsers.longValue(minimum),
                 maxFrequencyKHz = KernelParsers.longValue(maximum),
