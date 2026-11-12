@@ -307,14 +307,9 @@ class KernelRepository(
 
         val numeric = value.toLongOrNull()
             ?: return ControlResult(false, "Invalid schedutil value.")
-        val allowed = when (tunable) {
-            "hispeed_load" -> numeric in 0L..100L
-            "hispeed_freq" -> numeric in policy.availableFrequenciesKHz
-            "up_rate_limit_us", "down_rate_limit_us" -> numeric in 0L..1_000_000L
-            "pl" -> numeric in 0L..1L
-            else -> false
+        if (!KernelParsers.isValidSchedutilTunable(tunable, numeric, policy.availableFrequenciesKHz)) {
+            return ControlResult(false, "Schedutil value is outside the supported range.")
         }
-        if (!allowed) return ControlResult(false, "Schedutil value is outside the supported range.")
 
         val path = "$policyPath/schedutil/$tunable"
         val oldValue = read(path)?.trim()
