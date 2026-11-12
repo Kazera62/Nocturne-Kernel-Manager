@@ -80,6 +80,8 @@ read sysfs directly.
 | Thermal | /sys/class/thermal/thermal_zone*/ | Read-only |
 | Memory / ZRAM | /proc/meminfo, /sys/block/zram0/ | Read-only |
 | I/O scheduler | /sys/block/*/queue/scheduler | Active scheduler must be in node's available list |
+| VM parameters | /proc/sys/vm/swappiness, /proc/sys/vm/vfs_cache_pressure | swappiness 0–100; cache pressure 10–200 |
+| TCP congestion | /proc/sys/net/ipv4/tcp_congestion_control | Selected algorithm must be in tcp_available_congestion_control |
 | Battery | Android ACTION_BATTERY_CHANGED | Read-only |
 | Network | Android TrafficStats | Read-only |
 | Kernel log | dmesg | Read-only |
@@ -98,7 +100,13 @@ not represented as supported.
    min > max.
 7. On a failed write, attempt to restore the previous values.
 
-Runtime changes are not guaranteed to survive a reboot. No voltage node,
+Runtime changes are not guaranteed to survive a reboot. VM controls are
+bounded to swappiness 0–100 and VFS cache pressure 10–200; the repository reads
+old values before writing and attempts a rollback if a multi-value update
+fails. TCP congestion control is selected only from the kernel's available
+algorithm list. Network and VM changes are runtime-only.
+
+No voltage node,
 regulator, CPR, GPU, or thermal interface is writable through this app.
 
 ## Root compatibility
@@ -119,8 +127,8 @@ version and ROM.
 - No recreation of kernel-owned Zygote DDR bandwidth boost by application polling.
 - Unknown interfaces remain unsupported/read-only.
 
-CPU policy and I/O scheduler controls are deliberately limited to values
-reported by the running kernel. Future write features must have a documented
+CPU policy, I/O scheduler, and TCP congestion controls are limited to values
+reported by the running kernel. VM parameters use narrow documented ranges. Future write features must have a documented
 path allow-list, value validation, failure handling, and device testing.
 
 ## UI refresh
