@@ -2,35 +2,30 @@
 
 ## Scope
 
-Nocturne Kernel Manager is an Android kernel-management application for
-Samsung Galaxy M11 / A11 target devices.
+Nocturne Kernel Manager targets Samsung Galaxy M11 / A11 SDM450 devices.
 
-The app uses a root shell only through the standard su -c interface. It does
-not expose an arbitrary shell command field. Write operations are restricted
-to a small list of known kernel nodes and validated values.
+The app requires root permission only through the installed root manager's SU interface. It uses a cached interactive root session, a serialized command channel and bounded timeouts. The UI does not expose arbitrary shell command input.
 
-## Current write surfaces
+## Current writable interfaces
 
-- CPU cpufreq governor and scaling min/max values from a detected policy and
-  its exposed OPP/governor lists.
-- Block I/O scheduler values listed by the matching scheduler node.
-- VM swappiness (0–100) and VFS cache pressure (10–200).
-- TCP congestion algorithm listed by the kernel's available algorithm node.
+- CPU cpufreq governor and min/max frequency, validated against the live policy OPP/governor lists.
+- Block I/O scheduler, validated against the live scheduler list.
+- VM swappiness (0–100).
+- VM VFS cache pressure (10–200).
+- TCP congestion algorithm, validated against the kernel's live available list.
 
-GPU, voltage, regulator, CPR/corner, DDR overclock and thermal-protection
-interfaces are not writable through the app.
+All writes are checked by read-back where applicable. Multi-value changes attempt best-effort rollback on failure.
 
-## Reporting vulnerabilities
+## Read-only interfaces
 
-Do not publish exploitable security details in public issues. Use GitHub's
-private vulnerability reporting for this repository if enabled. Otherwise,
-contact the repository maintainer privately through GitHub.
+CPU core topology, GPU/KGSL, CCI/DDR devfreq, thermal zones, ZRAM algorithm, KSM, entropy, battery, storage, network counters and kernel logs are read-only.
 
-Include affected version, device model, Android version, root manager, kernel
-version, impact, and a safe reproduction description.
+## Explicit non-features
 
-## Root authorization
+The app does not write GPU clocks, voltage, regulator, CPR/corner, DDR/RAM overclock, thermal trip-points or CPU hotplug nodes. It has no arbitrary shell command field.
 
-Root permission is mediated by the installed root manager. Review the
-permission prompt before granting access. Revoke the app's root permission
-through that manager when it is no longer needed.
+## Reporting
+
+Do not publish exploitable details in public issues. Use GitHub private vulnerability reporting if enabled, otherwise contact the repository maintainer privately.
+
+Include app version, device model, Android version, root manager/version, kernel release, impact and a safe reproduction description.
