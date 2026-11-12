@@ -1,5 +1,17 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+- Centralize validation for kernel read paths, CCI/DDR devfreq nodes and secondary CPU hotplug limits so the repository and root bridge apply the same guard rules.
+- Update the security policy to describe the controls that are actually writable in 0.4.0.
+
+### Tests
+- Add unit coverage for allowed kernel read roots, devfreq node paths/names and the two-online-core hotplug minimum.
+
+### CI
+- Run Android verification on every branch push and pull requests targeting main, while retaining manual dispatch.
+
 ## [0.4.0] - 2026-11-12
 
 ### Added

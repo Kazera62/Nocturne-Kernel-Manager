@@ -279,11 +279,11 @@ class KernelRepository(
             read("/sys/devices/system/cpu/cpu$cpu/online")?.toIntOrNull() == 1 ||
                 (cpu == 0 && read("/sys/devices/system/cpu/cpu0/online") == null)
         }
-        if (!online && previous == 1 && onlineCount <= 2) {
-            return ControlResult(false, "At least two CPU cores must remain online.")
-        }
         val target = if (online) 1 else 0
         if (previous == target) return ControlResult(true, "CPU$coreId is already in the requested state.")
+        if (!KernelParsers.canChangeCpuOnline(coreId, online, onlineCount)) {
+            return ControlResult(false, "At least two CPU cores must remain online.")
+        }
         val result = rootShell.writeCpuOnline(coreId, online)
         if (!result.success) return ControlResult(false, result.error ?: "CPU hotplug write failed.")
         val verified = read(onlinePath)?.toIntOrNull()
@@ -354,11 +354,11 @@ class KernelRepository(
 
     fun applyDevfreqLimits(path: String, minimumHz: Long, maximumHz: Long): ControlResult {
         if (!rootAccess().available) return ControlResult(false, "Root permission is required.")
-        if (!Regex("^/sys/class/devfreq/[A-Za-z0-9_.:@,-]+$").matches(path)) {
+        if (!KernelParsers.isSupportedDevfreqPath(path)) {
             return ControlResult(false, "Rejected unknown devfreq path.")
         }
-        val name = (read("$path/name") ?: path.substringAfterLast('/')).lowercase()
-        if (listOf("cci", "cpubw", "bus", "ddr", "mem", "llcc").none { name.contains(it) }) {
+        val name = read("$path/name") ?: path.substringAfterLast('/')
+        if (!KernelParsers.isSupportedDevfreqName(name)) {
             return ControlResult(false, "Only detected CCI/DDR fabric nodes are supported.")
         }
         if (minimumHz <= 0L || maximumHz <= 0L || minimumHz > maximumHz) {

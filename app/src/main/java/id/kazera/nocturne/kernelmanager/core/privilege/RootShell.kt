@@ -114,10 +114,9 @@ class RootShell : AutoCloseable {
     }
 
     fun writeDevfreqLimit(path: String, bound: String, frequencyHz: Long): ShellResult {
-        val nodeName = path.substringAfterLast('/').lowercase()
-        val isFabric = listOf("cci", "cpubw", "bus", "ddr", "mem", "llcc")
-            .any { nodeName.contains(it) }
-        val allowedPath = Regex("^/sys/class/devfreq/[A-Za-z0-9_.:@,-]+$").matches(path)
+        val nodeName = path.substringAfterLast('/')
+        val isFabric = KernelParsers.isSupportedDevfreqName(nodeName)
+        val allowedPath = KernelParsers.isSupportedDevfreqPath(path)
         if (!allowedPath || !isFabric || bound !in setOf("min_freq", "max_freq") ||
             frequencyHz !in 1L..10_000_000_000L) {
             return rejected("Rejected unsupported devfreq target or value.")
@@ -294,12 +293,8 @@ class RootShell : AutoCloseable {
         }
     }
 
-    private fun isAllowedReadPath(path: String): Boolean {
-        if (path.contains("..") || path.contains('\u0000')) return false
-        return path.startsWith("/sys/") ||
-            path.startsWith("/proc/") ||
-            path.startsWith("/vendor/")
-    }
+    private fun isAllowedReadPath(path: String): Boolean =
+        KernelParsers.isAllowedKernelReadPath(path)
 
     private fun quote(value: String): String =
         "'" + value.replace("'", "'\\''") + "'"

@@ -42,10 +42,15 @@ Fokus pengembangan:
 ./gradlew assembleDebug
 ```
 
-## Manual CI
+## Continuous integration
 
-GitHub Actions workflow **Android CI** dijalankan melalui tab Actions:
-**Android CI → Run workflow → main**. Push dan pull request tidak memicu CI.
+GitHub Actions workflow **Android CI** runs automatically for every branch push and for pull requests targeting
+`main`. It can also be started manually
+from **Actions → Android CI → Run workflow** on `main`.
+
+The workflow runs unit tests, Android lint and a debug APK build. Keep
+contributor changes free of credentials and do not add secrets to pull-request
+build steps.
 
 ## Commit prefixes
 
