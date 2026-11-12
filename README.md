@@ -15,14 +15,14 @@ Target M11/A11 adalah fokus pengembangan. Seluruh varian regional, firmware, ROM
 | Area | Function |
 | --- | --- |
 | Root | Startup root preflight, persistent SU session, status chip, manual re-check |
-| CPU | Per-policy governor, OPP table, current/min/max frequency |
+| CPU | Per-policy governor, OPP table, current/min/max frequency; optional schedutil tunables when exposed |
 | CPU topology | Present/online monitoring; CPU0 protected and optional hotplug for secondary cores 1–7 |
 | GPU | Adreno/KGSL telemetry and maximum power-level selection from the live OPP table (Advanced menu) |
 | CPU tuning | Live schedutil hispeed load/frequency and rate-limit tunables when exposed |
 | Storage policy | Optional Dynamic Fsync runtime toggle when its kernel node exists |
 | CCI / DDR | Devfreq min/max tuning only when writable nodes and matching live OPPs are exposed; otherwise read-only |
 | Memory | RAM, ZRAM statistics, swappiness, VFS cache pressure |
-| Kernel extras | ZRAM compression algorithm, KSM status/statistics, entropy readings |
+| Kernel extras | ZRAM compression algorithm, KSM status/statistics, entropy readings, optional Dynamic Fsync |
 | Thermal | Detected thermal-zone temperatures |
 | I/O | Disk statistics; scheduler controls for whole-device `mmcblk*`, `sda`–`sdc` and `nvme*` only |
 | Network | RX/TX counters and kernel-supported TCP congestion algorithms |
@@ -64,6 +64,8 @@ The bridge targets root managers that provide a standard SU interface, including
 | GPU maximum OPP | Exact live KGSL OPP mapped to max_pwrlevel; min_pwrlevel and num_pwrlevels rechecked, with read-back and rollback |
 | CPU hotplug | CPU0 protected; secondary CPU IDs 1–7 only, present/online verification and at least two online cores |
 | CCI/DDR devfreq limits | Only detected fabric paths; min/max must be present in the live available_frequencies table, with ordered writes and rollback |
+| Schedutil | hispeed_load 0–100; hispeed_freq from live CPU OPPs; rate limits 0–1,000,000 µs; read-back and rollback |
+| Dynamic Fsync | Fixed kernel node, state 0/1 only, read-back and rollback; can defer fsync/fdatasync |
 | schedutil tunables | Active schedutil policies only; hispeed frequency must match a live CPU OPP, load 0–100 and rate limits 0–1,000,000 µs |
 | Dynamic Fsync | Exact runtime node, 0/1 values, read-back and rollback; may defer fsync/fdatasync and risk recent writes |
 
@@ -94,9 +96,11 @@ The application does not expose:
 - CPU0 hotplug or disabling cores when only two cores would not remain online;
 - arbitrary shell commands from the UI.
 
-GPU maximum-OPP selection is the only GPU write. CCI/DDR min/max limits are available only when the exact live nodes and OPPs are writable; regulator voltage, KSM, ZRAM algorithm and entropy remain monitoring-only. Schedutil changes apply only to validated tunables for an active schedutil governor. Dynamic Fsync is opt-in and carries a data-integrity risk if power is lost while writes are deferred. Kernel-side Zygote DDR bandwidth boost, when provided by the running kernel, remains kernel-owned and is not recreated by app polling.
+GPU maximum-OPP selection is the only GPU write. CCI/DDR min/max limits are available only when the exact live nodes and OPPs are writable; regulator voltage, KSM, ZRAM algorithm and entropy remain monitoring-only. Schedutil and Dynamic Fsync are conditional runtime controls, shown only when their kernel nodes exist. Schedutil changes apply only to validated tunables for an active schedutil governor. Dynamic Fsync is opt-in and carries a data-integrity risk if power is lost while writes are deferred. Kernel-side Zygote DDR bandwidth boost, when provided by the running kernel, remains kernel-owned and is not recreated by app polling.
 
 ## Advanced tuning and KonaBess
+
+Schedutil tunables appear only for policies currently using `schedutil` and only when individual tunable nodes are readable. Hispeed frequency is limited to the active CPU OPP table; rate limits are bounded and changes are verified. Dynamic Fsync appears only when `/sys/kernel/dyn_fsync/Dyn_fsync_active` is available. It may defer `fsync`/`fdatasync` while the display is on; a kernel crash or forced power loss during that period can lose recent writes or corrupt data. Leave it disabled when storage integrity is more important than write-latency behavior.
 
 Advanced is disabled by default and enabled from Settings. GPU control maps an existing KGSL OPP to the driver's max_pwrlevel index; it does not change the OPP table, write voltage, or touch thermal_pwrlevel. CPU frequency limits continue to use the live cpufreq OPP list. Secondary CPU hotplug (IDs 1–7) is available with CPU0 protected and a two-core minimum. CCI/DDR limits can be written only when the device exposes readable min_freq/max_freq nodes and the selected values match its live OPP table; otherwise the card remains telemetry-only. Regulator voltage remains read-only.
 
