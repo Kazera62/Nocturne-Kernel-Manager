@@ -124,10 +124,10 @@ class KernelRepository(
         val governorPath = policy.path + "/scaling_governor"
 
         // Re-read live capability lists; never trust a stale UI snapshot for a write.
-        val liveFrequencies = KernelParsers.frequencyList(
-            read(policy.path + "/scaling_available_frequencies")
-                ?: read(policy.path + "/cpuinfo_available_frequencies")
-        )
+        val liveFrequencyText = read(policy.path + "/scaling_available_frequencies")
+            ?.takeIf { it.isNotBlank() }
+            ?: read(policy.path + "/cpuinfo_available_frequencies")
+        val liveFrequencies = KernelParsers.frequencyList(liveFrequencyText)
         if (liveFrequencies.isEmpty() || minFrequencyKHz !in liveFrequencies ||
             maxFrequencyKHz !in liveFrequencies) {
             return ControlResult(false, "Selected frequencies are no longer in the live kernel OPP table.")
@@ -217,6 +217,14 @@ class KernelRepository(
             rootShell.writeVmSetting("swappiness", oldSwappiness)
             return ControlResult(false, cacheResult.error ?: "VM update failed; previous values were restored where possible.")
         }
+
+        val verifiedSwappiness = read("/proc/sys/vm/swappiness")?.toIntOrNull()
+        val verifiedCachePressure = read("/proc/sys/vm/vfs_cache_pressure")?.toIntOrNull()
+        if (verifiedSwappiness != swappiness || verifiedCachePressure != cachePressure) {
+            rootShell.writeVmSetting("vfs_cache_pressure", oldCachePressure)
+            rootShell.writeVmSetting("swappiness", oldSwappiness)
+            return ControlResult(false, "VM read-back did not match; previous values were restored where possible.")
+        }
         return ControlResult(true, "VM settings updated for the current boot session.")
     }
 
@@ -228,10 +236,14 @@ class KernelRepository(
             return ControlResult(false, "The selected TCP congestion algorithm is not exposed by this kernel.")
         }
         val result = rootShell.writeTcpCongestionControl(selected)
-        return if (result.success) {
+        if (!result.success) {
+            return ControlResult(false, result.error ?: "TCP congestion control update failed.")
+        }
+        val active = read("/proc/sys/net/ipv4/tcp_congestion_control")
+        return if (active == selected) {
             ControlResult(true, "TCP congestion control changed to " + selected + ".")
         } else {
-            ControlResult(false, result.error ?: "TCP congestion control update failed.")
+            ControlResult(false, "TCP read-back did not match the requested algorithm.")
         }
     }
 
@@ -248,10 +260,14 @@ class KernelRepository(
             return ControlResult(false, "The selected I/O scheduler is not exposed by the live kernel node.")
         }
         val result = rootShell.writeIoScheduler(scheduler.path, selected)
-        return if (result.success) {
+        if (!result.success) {
+            return ControlResult(false, result.error ?: "I/O scheduler update failed.")
+        }
+        val active = KernelParsers.schedulerList(read(scheduler.path)).first
+        return if (active == selected) {
             ControlResult(true, scheduler.deviceName + " scheduler changed to " + selected + ".")
         } else {
-            ControlResult(false, result.error ?: "I/O scheduler update failed.")
+            ControlResult(false, "I/O scheduler read-back did not match the requested value.")
         }
     }
 
