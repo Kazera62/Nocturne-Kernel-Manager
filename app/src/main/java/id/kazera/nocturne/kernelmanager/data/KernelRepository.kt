@@ -23,6 +23,8 @@ import id.kazera.nocturne.kernelmanager.domain.model.IoUsage
 import id.kazera.nocturne.kernelmanager.domain.model.KernelExtras
 import id.kazera.nocturne.kernelmanager.domain.model.MemoryInfo
 import id.kazera.nocturne.kernelmanager.domain.model.RegulatorTelemetry
+import id.kazera.nocturne.kernelmanager.domain.model.AdvancedKernelInfo
+import id.kazera.nocturne.kernelmanager.domain.model.SchedutilTunablesInfo
 import id.kazera.nocturne.kernelmanager.domain.model.StorageInfo
 import id.kazera.nocturne.kernelmanager.domain.model.ThermalSensor
 import java.io.File
@@ -57,6 +59,7 @@ class KernelRepository(
         val ioSchedulers = discoverIoSchedulers()
         val memory = readMemory()
         val kernelExtras = readKernelExtras()
+        val advancedKernel = discoverAdvancedKernel(cpuPolicies)
         val battery = readBattery(context)
         val storage = readStorage()
         val ioUsage = readIoUsage()
@@ -110,7 +113,8 @@ class KernelRepository(
             ioUsage = ioUsage,
             tcpCongestionControl = tcpCongestion,
             availableTcpCongestionControls = availableTcpCongestion,
-            warnings = warnings
+            warnings = warnings,
+            advancedKernel = advancedKernel
         )
     }
 
@@ -288,6 +292,64 @@ class KernelRepository(
             return ControlResult(false, "CPU hotplug read-back failed; previous state was restored where possible.")
         }
         return ControlResult(true, "CPU$coreId is now " + if (online) "online." else "offline.")
+    }
+
+    fun applySchedutilTunable(policyPath: String, tunable: String, value: String): ControlResult {
+        if (!rootAccess().available) return ControlResult(false, "Root permission is required.")
+        if (!Regex("^/sys/devices/system/cpu/(cpufreq/policy[0-9]+|cpu[0-7]/cpufreq)$").matches(policyPath)) {
+            return ControlResult(false, "Rejected unknown CPU policy path.")
+        }
+        val policy = discoverCpuPolicies().firstOrNull { it.path == policyPath }
+            ?: return ControlResult(false, "CPU policy is no longer available.")
+        if (policy.governor != "schedutil") {
+            return ControlResult(false, "The policy is not using schedutil.")
+        }
+
+        val numeric = value.toLongOrNull()
+            ?: return ControlResult(false, "Invalid schedutil value.")
+        val allowed = when (tunable) {
+            "hispeed_load" -> numeric in 0L..100L
+            "hispeed_freq" -> numeric in policy.availableFrequenciesKHz
+            "up_rate_limit_us", "down_rate_limit_us" -> numeric in 0L..1_000_000L
+            "pl" -> numeric in 0L..1L
+            else -> false
+        }
+        if (!allowed) return ControlResult(false, "Schedutil value is outside the supported range.")
+
+        val path = "$policyPath/schedutil/$tunable"
+        val oldValue = read(path)?.trim()
+            ?: return ControlResult(false, "Schedutil tunable is not exposed by this kernel.")
+        if (oldValue == value) return ControlResult(true, "Schedutil tunable is already set.")
+
+        val write = rootShell.writeSchedutilTunable(policyPath, tunable, value)
+        if (!write.success) {
+            return ControlResult(false, write.error ?: "Schedutil update failed.")
+        }
+        if (read(path)?.trim() != value) {
+            rootShell.writeSchedutilTunable(policyPath, tunable, oldValue)
+            return ControlResult(false, "Schedutil read-back failed; previous value was restored where possible.")
+        }
+        return ControlResult(true, "Schedutil tunable updated for this boot session.")
+    }
+
+    fun setDynamicFsyncEnabled(enabled: Boolean): ControlResult {
+        if (!rootAccess().available) return ControlResult(false, "Root permission is required.")
+        val path = "/sys/kernel/dyn_fsync/Dyn_fsync_active"
+        val current = read(path)?.trim()
+            ?: return ControlResult(false, "Dynamic Fsync is not exposed by this kernel.")
+        if (current !in setOf("0", "1")) {
+            return ControlResult(false, "Dynamic Fsync status is invalid.")
+        }
+        val selected = if (enabled) "1" else "0"
+        if (current == selected) return ControlResult(true, "Dynamic Fsync is already in the requested state.")
+
+        val write = rootShell.writeDynamicFsync(enabled)
+        if (!write.success) return ControlResult(false, write.error ?: "Dynamic Fsync update failed.")
+        if (read(path)?.trim() != selected) {
+            rootShell.writeDynamicFsync(current == "1")
+            return ControlResult(false, "Dynamic Fsync read-back failed; previous state was restored where possible.")
+        }
+        return ControlResult(true, "Dynamic Fsync updated for this boot session.")
     }
 
     fun applyDevfreqLimits(path: String, minimumHz: Long, maximumHz: Long): ControlResult {
@@ -617,6 +679,54 @@ class KernelRepository(
             availableFrequenciesMHz = available.map { (it / 1_000_000L).toInt() }.distinct(),
             minimumClockMHz = minimumFrequency?.let { (it / 1_000_000L).toInt() },
             maximumClockMHz = maximumFrequency?.let { (it / 1_000_000L).toInt() }
+        )
+    }
+
+    private fun discoverAdvancedKernel(cpuPolicies: List<CpuPolicyInfo>): AdvancedKernelInfo {
+        val schedutilTunables = cpuPolicies.mapNotNull { policy ->
+            if (policy.governor != "schedutil") return@mapNotNull null
+
+            val path = policy.path + "/schedutil"
+            val hispeedLoad = read("$path/hispeed_load")?.toIntOrNull()
+            val hispeedFrequency = read("$path/hispeed_freq")?.toLongOrNull()
+            val upRate = read("$path/up_rate_limit_us")?.toLongOrNull()
+            val downRate = read("$path/down_rate_limit_us")?.toLongOrNull()
+            val powerLimit = read("$path/pl")?.let {
+                when (it.trim().lowercase()) {
+                    "1", "y", "yes", "true", "on" -> true
+                    "0", "n", "no", "false", "off" -> false
+                    else -> null
+                }
+            }
+
+            if (hispeedLoad == null && hispeedFrequency == null && upRate == null &&
+                downRate == null && powerLimit == null) {
+                null
+            } else {
+                SchedutilTunablesInfo(
+                    policyPath = policy.path,
+                    path = path,
+                    hispeedLoad = hispeedLoad,
+                    hispeedFrequencyKHz = hispeedFrequency,
+                    upRateLimitUs = upRate,
+                    downRateLimitUs = downRate,
+                    powerLimitEnabled = powerLimit
+                )
+            }
+        }.distinctBy { it.path }
+
+        val fsyncPath = "/sys/kernel/dyn_fsync/Dyn_fsync_active"
+        val fsyncEnabled = read(fsyncPath)?.trim()?.let {
+            when (it) {
+                "1" -> true
+                "0" -> false
+                else -> null
+            }
+        }
+        return AdvancedKernelInfo(
+            schedutilTunables = schedutilTunables,
+            dynamicFsyncPath = fsyncPath.takeIf { fsyncEnabled != null },
+            dynamicFsyncEnabled = fsyncEnabled
         )
     }
 
