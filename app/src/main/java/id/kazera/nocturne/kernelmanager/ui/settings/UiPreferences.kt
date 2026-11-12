@@ -12,7 +12,7 @@ object UiPreferences {
         val saved = context.getSharedPreferences(FILE_NAME, Context.MODE_PRIVATE)
             .getString(KEY_LANGUAGE, null)
         if (saved == "en" || saved == "id") return saved
-        return if (Locale.getDefault().language.equals("id", ignoreCase = true)) "id" else "en"
+        return if (Locale.getDefault().language.lowercase(Locale.US) in setOf("id", "in")) "id" else "en"
     }
 
     fun setLanguage(context: Context, language: String) {
