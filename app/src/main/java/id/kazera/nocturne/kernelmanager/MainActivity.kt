@@ -42,7 +42,7 @@ class MainActivity : Activity() {
 
         screen = HomeScreen(
             context = this,
-            onRefresh = { refresh() },
+            onRefresh = { refresh(forceRender = true) },
             onCpuApply = { policy, governor, minimum, maximum ->
                 applyCpu(policy, governor, minimum, maximum)
             },
@@ -69,7 +69,7 @@ class MainActivity : Activity() {
         super.onDestroy()
     }
 
-    private fun refresh() {
+    private fun refresh(forceRender: Boolean = false) {
         if (!refreshInFlight.compareAndSet(false, true)) return
         worker.execute {
             val result = try {
@@ -79,7 +79,7 @@ class MainActivity : Activity() {
             }
             runOnUiThread {
                 refreshInFlight.set(false)
-                if (result != null && !isFinishing) screen.update(result)
+                if (result != null && !isFinishing) screen.update(result, forceRender)
             }
         }
     }
@@ -94,7 +94,7 @@ class MainActivity : Activity() {
             val result = repository.applyCpuPolicy(policy, governor, minimum, maximum)
             runOnUiThread {
                 Toast.makeText(this, result.message, Toast.LENGTH_LONG).show()
-                refresh()
+                refresh(forceRender = true)
             }
         }
     }
