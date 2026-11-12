@@ -17,6 +17,9 @@ class ProjectScopeTest {
     fun enablesOnlyTheImplementedControlSurfaces() {
         assertTrue(ProjectScope.ROOT_BRIDGE_ENABLED)
         assertTrue(ProjectScope.DEVICE_MONITORING_ENABLED)
+        assertTrue(ProjectScope.CPU_TOPOLOGY_MONITORING_ENABLED)
+        assertTrue(ProjectScope.KERNEL_EXTRAS_MONITORING_ENABLED)
+        assertTrue(ProjectScope.BILINGUAL_UI_ENABLED)
         assertTrue(ProjectScope.CPU_CONTROLS_ENABLED)
         assertTrue(ProjectScope.IO_SCHEDULER_CONTROLS_ENABLED)
         assertTrue(ProjectScope.VM_CONTROLS_ENABLED)
