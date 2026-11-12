@@ -1,5 +1,7 @@
 package id.kazera.nocturne.kernelmanager.core.privilege
 
+import id.kazera.nocturne.kernelmanager.core.kernel.KernelParsers
+
 import java.io.BufferedReader
 import java.io.BufferedWriter
 import java.io.IOException
@@ -83,9 +85,7 @@ class RootShell : AutoCloseable {
     }
 
     fun writeSchedutilTunable(tunablesPath: String, tunable: String, value: String): ShellResult {
-        val pathAllowed = Regex(
-            "^/sys/devices/system/cpu/(cpufreq/policy[0-9]+/schedutil|cpu[0-7]/cpufreq/schedutil|cpufreq/schedutil)$"
-        ).matches(tunablesPath)
+        val pathAllowed = KernelParsers.isSupportedSchedutilTunablesPath(tunablesPath)
         val tunableAllowed = tunable in setOf(
             "hispeed_load", "hispeed_freq", "up_rate_limit_us", "down_rate_limit_us", "pl"
         )
