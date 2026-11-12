@@ -72,7 +72,7 @@ class HomeScreen(
             render(restoreScroll = true)
             return
         }
-        if (selectedPage != Page.OVERVIEW && selectedPage != Page.MONITOR) return
+        if (selectedPage == Page.SETTINGS) return
 
         if (renderedStructureKey != structureKey(value)) {
             render(restoreScroll = true)
@@ -95,9 +95,13 @@ class HomeScreen(
     private fun structureKey(data: DeviceSnapshot): String = buildString {
         append(data.cpuCores.map { it.coreId })
         append('|')
-        append(data.cpuPolicies.map { it.path })
+        append(data.cpuPolicies.map { listOf(it.path, it.availableFrequenciesKHz, it.availableGovernors) })
         append('|')
         append(data.devfreq.map { it.path })
+        append('|')
+        append(data.ioSchedulers.map { listOf(it.path, it.availableSchedulers) })
+        append('|')
+        append(data.availableTcpCongestionControls)
         append('|')
         append(data.thermalSensors.map { it.name })
         append('|')
@@ -454,7 +458,7 @@ class HomeScreen(
                 addUnsupported(card, "CPU core topology")
             } else {
                 data.cpuCores.forEach { core ->
-                    addInfoRow(
+                    addLiveInfoRow(
                         card,
                         "Core " + core.coreId,
                         when (core.online) {
@@ -462,7 +466,13 @@ class HomeScreen(
                             false -> "Offline"
                             null -> "Unknown"
                         }
-                    )
+                    ) { current ->
+                        when (current.cpuCores.firstOrNull { it.coreId == core.coreId }?.online) {
+                            true -> "Online"
+                            false -> "Offline"
+                            null -> "Unknown"
+                        }
+                    }
                 }
             }
             addText(card, "Core hotplug control is not enabled in this build. This page only observes the kernel state.",
@@ -476,11 +486,11 @@ class HomeScreen(
 
     private fun addCpuPolicyCard(container: LinearLayout, data: DeviceSnapshot, policy: CpuPolicyInfo) {
         addCard(container, policy.name.uppercase(Locale.US), policy.path) { card ->
-            addInfoRow(card, "Current frequency", DeviceInfo.frequency(policy.currentFrequencyKHz))
-            addInfoRow(card, "Current governor", policy.governor ?: "Unsupported")
-            addInfoRow(card, "Current minimum", DeviceInfo.frequency(policy.minFrequencyKHz))
-            addInfoRow(card, "Current maximum", DeviceInfo.frequency(policy.maxFrequencyKHz))
-            addInfoRow(card, "Available OPP entries", policy.availableFrequenciesKHz.size.toString())
+            addLiveInfoRow(card, "Current frequency", DeviceInfo.frequency(policy.currentFrequencyKHz)) { current -> DeviceInfo.frequency(current.cpuPolicies.firstOrNull { it.path == policy.path }?.currentFrequencyKHz) }
+            addLiveInfoRow(card, "Current governor", policy.governor ?: "Unsupported") { current -> current.cpuPolicies.firstOrNull { it.path == policy.path }?.governor ?: "Unsupported" }
+            addLiveInfoRow(card, "Current minimum", DeviceInfo.frequency(policy.minFrequencyKHz)) { current -> DeviceInfo.frequency(current.cpuPolicies.firstOrNull { it.path == policy.path }?.minFrequencyKHz) }
+            addLiveInfoRow(card, "Current maximum", DeviceInfo.frequency(policy.maxFrequencyKHz)) { current -> DeviceInfo.frequency(current.cpuPolicies.firstOrNull { it.path == policy.path }?.maxFrequencyKHz) }
+            addLiveInfoRow(card, "Available OPP entries", policy.availableFrequenciesKHz.size.toString()) { current -> current.cpuPolicies.firstOrNull { it.path == policy.path }?.availableFrequenciesKHz?.size?.toString() ?: "Unsupported" }
 
             val writablePolicyPath =
                 Regex("^/sys/devices/system/cpu/(cpufreq/policy[0-9]+|cpu[0-7]/cpufreq)$").matches(policy.path)
@@ -584,43 +594,49 @@ class HomeScreen(
         addPageHeading(container, "Memory", "RAM and ZRAM telemetry.")
         addCard(container, "RAM") {
             val used = DeviceInfo.memoryUsedPercent(data)
-            addInfoRow(it, "Total", data.memory.totalKb?.let { value -> formatKb(value) } ?: "Unsupported")
-            addInfoRow(it, "Available", data.memory.availableKb?.let { value -> formatKb(value) } ?: "Unsupported")
-            addInfoRow(it, "Used", used?.let { "$it%" } ?: "Unsupported")
-            if (used != null) addProgress(it, used)
+            addLiveInfoRow(it, "Total", data.memory.totalKb?.let { value -> formatKb(value) } ?: "Unsupported") { current -> current.memory.totalKb?.let { value -> formatKb(value) } ?: "Unsupported" }
+            addLiveInfoRow(it, "Available", data.memory.availableKb?.let { value -> formatKb(value) } ?: "Unsupported") { current -> current.memory.availableKb?.let { value -> formatKb(value) } ?: "Unsupported" }
+            addLiveInfoRow(it, "Used", used?.let { "$it%" } ?: "Unsupported") { current -> DeviceInfo.memoryUsedPercent(current)?.let { value -> "$value%" } ?: "Unsupported" }
+            if (used != null) addLiveProgress(it, used) { current -> DeviceInfo.memoryUsedPercent(current) }
         }
         addCard(container, "ZRAM") {
-            addInfoRow(it, "Configured disk size", DeviceInfo.bytes(data.memory.zramDiskBytes))
-            addInfoRow(it, "Original data", DeviceInfo.bytes(data.memory.zramOriginalBytes))
-            addInfoRow(it, "Compressed data", DeviceInfo.bytes(data.memory.zramCompressedBytes))
-            addInfoRow(it, "Memory consumed", DeviceInfo.bytes(data.memory.zramMemoryBytes))
+            addLiveInfoRow(it, "Configured disk size", DeviceInfo.bytes(data.memory.zramDiskBytes)) { DeviceInfo.bytes(it.memory.zramDiskBytes) }
+            addLiveInfoRow(it, "Original data", DeviceInfo.bytes(data.memory.zramOriginalBytes)) { DeviceInfo.bytes(it.memory.zramOriginalBytes) }
+            addLiveInfoRow(it, "Compressed data", DeviceInfo.bytes(data.memory.zramCompressedBytes)) { DeviceInfo.bytes(it.memory.zramCompressedBytes) }
+            addLiveInfoRow(it, "Memory consumed", DeviceInfo.bytes(data.memory.zramMemoryBytes)) { DeviceInfo.bytes(it.memory.zramMemoryBytes) }
             addText(it, "ZRAM settings are read-only.", MUTED, 11f, top = 8)
         }
         addCard(container, "KERNEL OPTIMIZATION TELEMETRY") { card ->
             val extra = data.kernelExtras
-            addInfoRow(card, "ZRAM compression algorithm", extra.zramCompressionAlgorithm ?: "Unsupported")
-            addInfoRow(
+            addLiveInfoRow(card, "ZRAM compression algorithm", extra.zramCompressionAlgorithm ?: "Unsupported") { it.kernelExtras.zramCompressionAlgorithm ?: "Unsupported" }
+            addLiveInfoRow(
                 card,
                 "Available ZRAM algorithms",
                 extra.availableZramCompressionAlgorithms.takeIf { it.isNotEmpty() }?.joinToString(", ") ?: "Unsupported"
-            )
-            addInfoRow(card, "KSM status", when (extra.ksmEnabled) {
+            ) { current -> current.kernelExtras.availableZramCompressionAlgorithms.takeIf { it.isNotEmpty() }?.joinToString(", ") ?: "Unsupported" }
+            addLiveInfoRow(card, "KSM status", when (extra.ksmEnabled) {
                 true -> "Enabled"
                 false -> "Disabled"
                 null -> if (extra.ksmSupported) "Unknown" else "Unsupported"
-            })
-            addInfoRow(card, "KSM shared pages", extra.ksmPagesShared?.toString() ?: "Unsupported")
-            addInfoRow(card, "KSM sharing pages", extra.ksmPagesSharing?.toString() ?: "Unsupported")
-            addInfoRow(card, "Entropy available", extra.entropyAvailable?.toString() ?: "Unsupported")
-            addInfoRow(card, "Entropy read threshold", extra.entropyReadWakeupThreshold?.toString() ?: "Unsupported")
-            addInfoRow(card, "Entropy write threshold", extra.entropyWriteWakeupThreshold?.toString() ?: "Unsupported")
+            }) { current ->
+                when (current.kernelExtras.ksmEnabled) {
+                    true -> "Enabled"
+                    false -> "Disabled"
+                    null -> if (current.kernelExtras.ksmSupported) "Unknown" else "Unsupported"
+                }
+            }
+            addLiveInfoRow(card, "KSM shared pages", extra.ksmPagesShared?.toString() ?: "Unsupported") { it.kernelExtras.ksmPagesShared?.toString() ?: "Unsupported" }
+            addLiveInfoRow(card, "KSM sharing pages", extra.ksmPagesSharing?.toString() ?: "Unsupported") { it.kernelExtras.ksmPagesSharing?.toString() ?: "Unsupported" }
+            addLiveInfoRow(card, "Entropy available", extra.entropyAvailable?.toString() ?: "Unsupported") { it.kernelExtras.entropyAvailable?.toString() ?: "Unsupported" }
+            addLiveInfoRow(card, "Entropy read threshold", extra.entropyReadWakeupThreshold?.toString() ?: "Unsupported") { it.kernelExtras.entropyReadWakeupThreshold?.toString() ?: "Unsupported" }
+            addLiveInfoRow(card, "Entropy write threshold", extra.entropyWriteWakeupThreshold?.toString() ?: "Unsupported") { it.kernelExtras.entropyWriteWakeupThreshold?.toString() ?: "Unsupported" }
             addText(card, "Kernel optimization interfaces are shown as read-only telemetry.", MUTED, 11f, top = 8)
         }
         addCard(container, "VIRTUAL MEMORY TUNING", "Runtime VM parameters · current boot session") { card ->
             val swappiness = data.memory.swappiness
             val cachePressure = data.memory.vfsCachePressure
-            addInfoRow(card, "Current swappiness", swappiness?.toString() ?: "Unsupported")
-            addInfoRow(card, "Current VFS cache pressure", cachePressure?.toString() ?: "Unsupported")
+            addLiveInfoRow(card, "Current swappiness", swappiness?.toString() ?: "Unsupported") { it.memory.swappiness?.toString() ?: "Unsupported" }
+            addLiveInfoRow(card, "Current VFS cache pressure", cachePressure?.toString() ?: "Unsupported") { it.memory.vfsCachePressure?.toString() ?: "Unsupported" }
             if (swappiness != null && cachePressure != null && swappiness in 0..100 && cachePressure in 10..200) {
                 val swappinessBar = addSeekControl(card, "Swappiness", swappiness, 0, 100)
                 val cacheBar = addSeekControl(card, "VFS cache pressure", cachePressure, 10, 200)
@@ -911,6 +927,32 @@ class HomeScreen(
 
     private fun addUnsupported(parent: LinearLayout, label: String) {
         addText(parent, t(label) + " · " + t("Unsupported"), MUTED, 12f, top = 5)
+    }
+
+    private fun addLiveProgress(
+        parent: LinearLayout,
+        initialValue: Int,
+        valueProvider: (DeviceSnapshot) -> Int?
+    ) {
+        val usedView = View(context).apply { background = rounded(ACCENT, ACCENT, 8f) }
+        val freeView = View(context).apply { background = rounded(BORDER, BORDER, 8f) }
+        val holder = LinearLayout(context).apply {
+            orientation = HORIZONTAL
+            addView(usedView, LayoutParams(0, dp(6), initialValue.coerceIn(0, 100).coerceAtLeast(1).toFloat()))
+            addView(freeView, LayoutParams(0, dp(6), (100 - initialValue).coerceAtLeast(0).toFloat()))
+        }
+        parent.addView(holder, LayoutParams(MATCH_PARENT, dp(6)).apply { topMargin = dp(9) })
+        liveBindings += { current ->
+            val next = valueProvider(current)?.coerceIn(0, 100) ?: 0
+            (usedView.layoutParams as? LayoutParams)?.let { params ->
+                params.weight = next.coerceAtLeast(1).toFloat()
+                usedView.layoutParams = params
+            }
+            (freeView.layoutParams as? LayoutParams)?.let { params ->
+                params.weight = (100 - next).coerceAtLeast(0).toFloat()
+                freeView.layoutParams = params
+            }
+        }
     }
 
     private fun addProgress(parent: LinearLayout, value: Int) {
