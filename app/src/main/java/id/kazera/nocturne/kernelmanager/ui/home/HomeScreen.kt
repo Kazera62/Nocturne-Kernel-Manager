@@ -535,6 +535,11 @@ class HomeScreen(
         addCard(container, "KERNEL OPTIMIZATION TELEMETRY") { card ->
             val extra = data.kernelExtras
             addInfoRow(card, "ZRAM compression algorithm", extra.zramCompressionAlgorithm ?: "Unsupported")
+            addInfoRow(
+                card,
+                "Available ZRAM algorithms",
+                extra.availableZramCompressionAlgorithms.takeIf { it.isNotEmpty() }?.joinToString(", ") ?: "Unsupported"
+            )
             addInfoRow(card, "KSM status", when (extra.ksmEnabled) {
                 true -> "Enabled"
                 false -> "Disabled"
