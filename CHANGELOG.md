@@ -4,7 +4,7 @@
 
 ### Fixed
 - Apply dynamic status-bar, navigation-bar and display-cutout insets to the root layout.
-- Restrict I/O scheduler discovery and disk totals to supported whole physical storage devices.
+- Restrict I/O scheduler discovery, disk totals and scheduler writes to supported whole physical storage devices.
 
 ### Changed
 - Keep sysfs/procfs reads, SU commands and SU session cleanup on a dedicated background I/O executor.
