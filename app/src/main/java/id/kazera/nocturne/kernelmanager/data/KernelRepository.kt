@@ -261,6 +261,97 @@ class KernelRepository(
         )
     }
 
+    fun applyCpuCoreOnline(coreId: Int, online: Boolean): ControlResult {
+        if (!rootAccess().available) return ControlResult(false, "Root permission is required.")
+        if (!KernelParsers.isSupportedCpuHotplugCore(coreId)) {
+            return ControlResult(false, "CPU0 is protected; supported secondary cores are 1–7.")
+        }
+        val present = KernelParsers.cpuList(read("/sys/devices/system/cpu/present"))
+        if (coreId !in present) return ControlResult(false, "Selected CPU core is not present.")
+        val onlinePath = "/sys/devices/system/cpu/cpu$coreId/online"
+        val previous = read(onlinePath)?.toIntOrNull()
+            ?: return ControlResult(false, "CPU hotplug interface is unavailable.")
+        val onlineCount = present.count { cpu ->
+            read("/sys/devices/system/cpu/cpu$cpu/online")?.toIntOrNull() == 1 ||
+                (cpu == 0 && read("/sys/devices/system/cpu/cpu0/online") == null)
+        }
+        if (!online && previous == 1 && onlineCount <= 2) {
+            return ControlResult(false, "At least two CPU cores must remain online.")
+        }
+        val target = if (online) 1 else 0
+        if (previous == target) return ControlResult(true, "CPU$coreId is already in the requested state.")
+        val result = rootShell.writeCpuOnline(coreId, online)
+        if (!result.success) return ControlResult(false, result.error ?: "CPU hotplug write failed.")
+        val verified = read(onlinePath)?.toIntOrNull()
+        if (verified != target) {
+            rootShell.writeCpuOnline(coreId, previous == 1)
+            return ControlResult(false, "CPU hotplug read-back failed; previous state was restored where possible.")
+        }
+        return ControlResult(true, "CPU$coreId is now " + if (online) "online." else "offline.")
+    }
+
+    fun applyDevfreqLimits(path: String, minimumHz: Long, maximumHz: Long): ControlResult {
+        if (!rootAccess().available) return ControlResult(false, "Root permission is required.")
+        if (!Regex("^/sys/class/devfreq/[A-Za-z0-9_.:@,-]+$").matches(path)) {
+            return ControlResult(false, "Rejected unknown devfreq path.")
+        }
+        val name = (read("$path/name") ?: path.substringAfterLast('/')).lowercase()
+        if (listOf("cci", "cpubw", "bus", "ddr", "mem", "llcc").none { name.contains(it) }) {
+            return ControlResult(false, "Only detected CCI/DDR fabric nodes are supported.")
+        }
+        if (minimumHz <= 0L || maximumHz <= 0L || minimumHz > maximumHz) {
+            return ControlResult(false, "Invalid devfreq range.")
+        }
+        val liveFrequencies = KernelParsers.frequencyList(read("$path/available_frequencies"))
+        if (liveFrequencies.isEmpty() || minimumHz !in liveFrequencies || maximumHz !in liveFrequencies) {
+            return ControlResult(false, "Selected values are not in the live devfreq table.")
+        }
+        val minPath = "$path/min_freq"
+        val maxPath = "$path/max_freq"
+        val oldMin = read(minPath)?.toLongOrNull()
+        val oldMax = read(maxPath)?.toLongOrNull()
+        if (oldMin == null || oldMax == null) {
+            return ControlResult(false, "Writable min_freq/max_freq nodes are not exposed.")
+        }
+        if (oldMin == minimumHz && oldMax == maximumHz) {
+            return ControlResult(true, "Devfreq range is already set.")
+        }
+        fun rollback() {
+            if (oldMin > maximumHz) {
+                rootShell.writeDevfreqLimit(path, "min_freq", oldMin)
+                rootShell.writeDevfreqLimit(path, "max_freq", oldMax)
+            } else {
+                rootShell.writeDevfreqLimit(path, "max_freq", oldMax)
+                rootShell.writeDevfreqLimit(path, "min_freq", oldMin)
+            }
+        }
+        val minFirst = maximumHz < oldMin
+        val first = if (minFirst) {
+            rootShell.writeDevfreqLimit(path, "min_freq", minimumHz)
+        } else {
+            rootShell.writeDevfreqLimit(path, "max_freq", maximumHz)
+        }
+        if (!first.success) {
+            rollback()
+            return ControlResult(false, first.error ?: "Devfreq range update failed.")
+        }
+        val second = if (minFirst) {
+            rootShell.writeDevfreqLimit(path, "max_freq", maximumHz)
+        } else {
+            rootShell.writeDevfreqLimit(path, "min_freq", minimumHz)
+        }
+        if (!second.success) {
+            rollback()
+            return ControlResult(false, second.error ?: "Devfreq range update failed.")
+        }
+        if (read(minPath)?.toLongOrNull() != minimumHz ||
+            read(maxPath)?.toLongOrNull() != maximumHz) {
+            rollback()
+            return ControlResult(false, "Devfreq read-back failed; previous limits were restored where possible.")
+        }
+        return ControlResult(true, "Devfreq range updated for this boot session.")
+    }
+
     fun applyVmSettings(swappiness: Int, cachePressure: Int): ControlResult {
         if (!rootAccess().available) return ControlResult(false, "Root permission is required.")
         if (swappiness !in 0..100 || cachePressure !in 10..200) {
