@@ -1425,8 +1425,13 @@ class HomeScreen(
         val labels = values.map { "$it µs" }
         val picker = spinner(labels, "$current µs")
         parent.addView(picker, LayoutParams(MATCH_PARENT, dp(44)))
+        val actionLabel = if (tunable == "up_rate_limit_us") {
+            "Apply up rate limit"
+        } else {
+            "Apply down rate limit"
+        }
         parent.addView(
-            actionButton("Apply $label", "Apply schedutil $label") {
+            actionButton(actionLabel, "Apply schedutil rate limit") {
                 if (!rootAvailable) {
                     toast("Root permission is required.")
                 } else {
