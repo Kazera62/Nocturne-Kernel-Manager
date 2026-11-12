@@ -37,6 +37,17 @@ class KernelParsersTest {
     }
 
     @Test
+    fun acceptsOnlySupportedWholePhysicalBlockDevices() {
+        listOf("mmcblk0", "mmcblk1", "sda", "sdb", "sdc", "nvme0n1", "nvme12n3")
+            .forEach { assertEquals(true, KernelParsers.isSupportedIoDevice(it)) }
+
+        listOf(
+            "loop0", "ram0", "dm-0", "zram0", "sdd",
+            "mmcblk0p1", "mmcblk0boot0", "sda1", "nvme0n1p1", "unknown"
+        ).forEach { assertEquals(false, KernelParsers.isSupportedIoDevice(it)) }
+    }
+
+    @Test
     fun parsesActiveIoScheduler() {
         val result = KernelParsers.schedulerList("none [mq-deadline] bfq")
         assertEquals("mq-deadline", result.first)
