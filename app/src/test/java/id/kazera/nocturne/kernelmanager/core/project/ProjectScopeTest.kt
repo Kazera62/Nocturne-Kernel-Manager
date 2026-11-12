@@ -19,6 +19,8 @@ class ProjectScopeTest {
         assertTrue(ProjectScope.DEVICE_MONITORING_ENABLED)
         assertTrue(ProjectScope.CPU_CONTROLS_ENABLED)
         assertTrue(ProjectScope.IO_SCHEDULER_CONTROLS_ENABLED)
+        assertTrue(ProjectScope.VM_CONTROLS_ENABLED)
+        assertTrue(ProjectScope.TCP_CONGESTION_CONTROL_ENABLED)
         assertFalse(ProjectScope.GPU_WRITE_CONTROLS_ENABLED)
         assertFalse(ProjectScope.VOLTAGE_CONTROLS_ENABLED)
         assertFalse(ProjectScope.THERMAL_LIMIT_CONTROLS_ENABLED)
