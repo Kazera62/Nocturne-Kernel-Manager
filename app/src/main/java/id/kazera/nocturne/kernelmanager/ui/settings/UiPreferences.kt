@@ -242,6 +242,7 @@ object UiText {
         "Nocturne Kernel Manager" to "Nocturne Kernel Manager",
         "Target: Samsung Galaxy M11 / A11 · SDM450" to "Target: Samsung Galaxy M11 / A11 · SDM450",
         "Version 0.3.0" to "Versi 0.3.0",
+        "Inspired by established kernel-manager concepts. Hardware controls are exposed only when validated interfaces are present." to "Terinspirasi dari konsep pengelola kernel yang telah digunakan luas. Kontrol hardware hanya ditampilkan saat interface yang tervalidasi tersedia.",
         "Unsupported" to "Tidak didukung",
         "Unknown" to "Tidak diketahui",
         "Root permission is required to read dmesg." to "Izin root diperlukan untuk membaca dmesg.",
