@@ -72,6 +72,7 @@ DeviceSnapshot contains a single sample for the UI. Nullable fields represent un
 | I/O scheduler | /sys/block/{mmcblk[0-9]+, sd[a-c], nvme[0-9]+n[0-9]+}/queue/scheduler | Whole physical devices only; selected value must appear in the live node list |
 | VM | /proc/sys/vm/swappiness, /proc/sys/vm/vfs_cache_pressure | swappiness 0–100; cache pressure 10–200 |
 | TCP congestion | /proc/sys/net/ipv4/tcp_congestion_control | Selected algorithm must be in the live available list |
+| Dynamic Fsync | /sys/kernel/dyn_fsync/Dyn_fsync_active | Optional 0/1 control; fixed path, read-back and rollback; deferred writes carry data-loss risk |
 | Battery | Android battery sticky broadcast | Read-only |
 | Network | Android TrafficStats | Read-only |
 | Kernel log | dmesg | Read-only |
