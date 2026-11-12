@@ -87,8 +87,7 @@ object UiText {
         "Apply governor and limits" to "Terapkan governor dan batas frekuensi",
         "RAM" to "RAM",
         "Read: " to "Dibaca: ",
-        "Core hotplug control is not enabled in this build. This page only observes the kernel state." to "Kontrol hotplug core belum diaktifkan pada build ini. Halaman ini hanya memantau status kernel."
-
+        "Core hotplug control is not enabled in this build. This page only observes the kernel state." to "Kontrol hotplug core belum diaktifkan pada build ini. Halaman ini hanya memantau status kernel.",
         "Root off" to "Root tidak aktif",
         "Root status unknown" to "Status root belum diketahui",
         "Privileged shell verified" to "Shell dengan akses root terverifikasi",
