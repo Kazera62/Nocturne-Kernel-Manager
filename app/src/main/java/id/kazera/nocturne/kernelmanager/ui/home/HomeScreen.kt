@@ -230,10 +230,11 @@ class HomeScreen(
             addInfoRow(it, "Uptime", DeviceInfo.uptime(data.uptimeSeconds))
         }
 
-        addCard(container, "ROOT ACCESS", data.root.provider) {
-            addText(it, if (data.root.available) "Privileged shell verified" else "Root permission not available",
-                if (data.root.available) ACCENT else WARNING, 15f, bold = true)
-            addText(it, data.root.detail, SECONDARY, 12f, top = 5)
+        val root = rootStatus ?: data.root
+        addCard(container, "ROOT ACCESS", root.provider) {
+            addText(it, if (root.available) "Privileged shell verified" else "Root permission not available",
+                if (root.available) ACCENT else WARNING, 15f, bold = true)
+            addText(it, root.detail, SECONDARY, 12f, top = 5)
             addText(it, "Uses the standard su command interface. Manager-specific APIs are not required for basic commands.",
                 MUTED, 11f, top = 9)
         }
@@ -278,6 +279,108 @@ class HomeScreen(
             }
         }
     }
+
+    private fun renderPerformance(container: LinearLayout, data: DeviceSnapshot) {
+        addPageHeading(container, "Performance", "CPU, virtual memory and storage scheduler controls.")
+        renderCpu(container, data)
+        renderMemory(container, data)
+        renderIo(container, data)
+    }
+
+    private fun renderMonitor(container: LinearLayout, data: DeviceSnapshot) {
+        addPageHeading(container, "Monitor", "Live hardware telemetry. Unsupported nodes are not simulated.")
+        renderGpu(container, data)
+        renderFabric(container, data)
+        renderThermal(container, data)
+    }
+
+    private fun renderSettings(container: LinearLayout, data: DeviceSnapshot?) {
+        addPageHeading(container, "Settings", "Application preferences and root diagnostics.")
+
+        addCard(container, "Application preferences") { card ->
+            addText(card, "Language", SECONDARY, 13f, bold = true)
+            addText(card, "Choose the language used throughout the application.", MUTED, 11f, top = 4, bottom = 10)
+            val languageRow = LinearLayout(context).apply {
+                orientation = HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+            }
+            val currentLanguage = UiPreferences.language(context)
+            languageRow.addView(
+                choiceButton("English", currentLanguage == "en") {
+                    onLanguageChanged("en")
+                    render(restoreScroll = true)
+                },
+                LayoutParams(0, dp(44), 1f).apply { rightMargin = dp(5) }
+            )
+            languageRow.addView(
+                choiceButton("Bahasa Indonesia", currentLanguage == "id") {
+                    onLanguageChanged("id")
+                    render(restoreScroll = true)
+                },
+                LayoutParams(0, dp(44), 1f).apply { leftMargin = dp(5) }
+            )
+            card.addView(languageRow, LayoutParams(MATCH_PARENT, dp(48)))
+        }
+
+        addCard(container, "Refresh interval") { card ->
+            addText(card, "Choose how often live kernel telemetry is refreshed.", MUTED, 11f, bottom = 8)
+            val currentInterval = UiPreferences.refreshIntervalSeconds(context)
+            val options = listOf("5 seconds", "8 seconds", "15 seconds", "30 seconds")
+            val picker = spinner(options, "$currentInterval seconds")
+            card.addView(picker, LayoutParams(MATCH_PARENT, dp(46)))
+            cardButton(card, "Apply refresh interval") {
+                val seconds = picker.selectedItem?.toString()
+                    ?.substringBefore(" ")
+                    ?.toIntOrNull()
+                if (seconds == null || seconds !in setOf(5, 8, 15, 30)) {
+                    toast("Select a valid refresh interval.")
+                } else {
+                    onRefreshIntervalChanged(seconds)
+                    toast("Refresh interval updated.")
+                }
+            }
+        }
+
+        addCard(container, "Root diagnostics") { card ->
+            val root = rootStatus ?: data?.root
+            addInfoRow(card, "Root access", when (root?.available) {
+                true -> "Enabled"
+                false -> "Disabled"
+                null -> "Unknown"
+            })
+            addInfoRow(card, "Provider", root?.provider ?: "Unknown")
+            addText(card, "Root access is checked before kernel telemetry is scanned. A cached SU session is reused for subsequent reads.",
+                MUTED, 11f, top = 8)
+            cardButton(card, "Check root now") {
+                onRootRefresh()
+            }
+        }
+
+        addCard(container, "ABOUT") { card ->
+            addText(card, "Nocturne Kernel Manager", TEXT, 15f, bold = true)
+            addText(card, "Target: Samsung Galaxy M11 / A11 · SDM450", SECONDARY, 12f, top = 5)
+            addText(card, "Version 0.2.0", MUTED, 11f, top = 5)
+            addText(card, "Inspired by established kernel-manager concepts. Hardware controls are exposed only when validated interfaces are present.",
+                MUTED, 11f, top = 9)
+        }
+    }
+
+    private fun choiceButton(label: String, selected: Boolean, action: () -> Unit): TextView =
+        TextView(context).apply {
+            text = label
+            textSize = 12f
+            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+            gravity = Gravity.CENTER
+            setTextColor(if (selected) BACKGROUND else TEXT)
+            background = rounded(
+                if (selected) ACCENT else SURFACE_ALT,
+                if (selected) ACCENT else BORDER,
+                12f
+            )
+            isClickable = true
+            isFocusable = true
+            setOnClickListener { action() }
+        }
 
     private fun renderCpu(container: LinearLayout, data: DeviceSnapshot) {
         addPageHeading(container, "CPU controls", "Only values exposed by each cpufreq policy are selectable.")
@@ -336,7 +439,7 @@ class HomeScreen(
                                 val min = selectedFrequency(minSpinner)
                                 val max = selectedFrequency(maxSpinner)
                                 val selectedGovernor = governorSpinner.selectedItem?.toString()
-                                    ?.takeIf { it != "Keep current" }
+                                    ?.takeIf { it != t("Keep current") }
                                 if (min == null || max == null) {
                                     toast("Kernel frequency values are unavailable.")
                                 } else {
@@ -408,6 +511,21 @@ class HomeScreen(
             addInfoRow(it, "Compressed data", DeviceInfo.bytes(data.memory.zramCompressedBytes))
             addInfoRow(it, "Memory consumed", DeviceInfo.bytes(data.memory.zramMemoryBytes))
             addText(it, "ZRAM configuration is shown read-only; no swap or compression policy is changed.", MUTED, 11f, top = 8)
+        }
+        addCard(container, "KERNEL OPTIMIZATION TELEMETRY") { card ->
+            val extra = data.kernelExtras
+            addInfoRow(card, "ZRAM compression algorithm", extra.zramCompressionAlgorithm ?: "Unsupported")
+            addInfoRow(card, "KSM status", when (extra.ksmEnabled) {
+                true -> "Enabled"
+                false -> "Disabled"
+                null -> if (extra.ksmSupported) "Unknown" else "Unsupported"
+            })
+            addInfoRow(card, "KSM shared pages", extra.ksmPagesShared?.toString() ?: "Unsupported")
+            addInfoRow(card, "KSM sharing pages", extra.ksmPagesSharing?.toString() ?: "Unsupported")
+            addInfoRow(card, "Entropy available", extra.entropyAvailable?.toString() ?: "Unsupported")
+            addInfoRow(card, "Entropy read threshold", extra.entropyReadWakeupThreshold?.toString() ?: "Unsupported")
+            addInfoRow(card, "Entropy write threshold", extra.entropyWriteWakeupThreshold?.toString() ?: "Unsupported")
+            addText(card, "Kernel optimization interfaces are shown as read-only telemetry.", MUTED, 11f, top = 8)
         }
         addCard(container, "VIRTUAL MEMORY TUNING", "Runtime VM parameters · current boot session") { card ->
             val swappiness = data.memory.swappiness
@@ -537,7 +655,7 @@ class HomeScreen(
                 cardButton(it, "Apply TCP algorithm") {
                     if (!data.root.available) toast("Root permission is required.")
                     else picker.selectedItem?.toString()
-                        ?.takeIf { selected -> selected != "Keep current" }
+                        ?.takeIf { selected -> selected != t("Keep current") }
                         ?.let { selected -> onTcpApply(selected) }
                 }
             } else {
@@ -600,7 +718,7 @@ class HomeScreen(
         bottom: Int = 0
     ): TextView {
         val view = TextView(context).apply {
-            text = value
+            text = t(value)
             textSize = size
             setTextColor(color)
             if (bold) typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
@@ -619,7 +737,7 @@ class HomeScreen(
         }
         row.addView(
             TextView(context).apply {
-                text = label
+                text = t(label)
                 textSize = 12f
                 setTextColor(SECONDARY)
             },
@@ -627,7 +745,7 @@ class HomeScreen(
         )
         row.addView(
             TextView(context).apply {
-                text = value
+                text = t(value)
                 textSize = 12f
                 setTextColor(TEXT)
                 gravity = Gravity.END
@@ -655,7 +773,8 @@ class HomeScreen(
 
     private fun spinner(options: List<String>, selected: String?): Spinner {
         val spinner = Spinner(context)
-        val adapter = object : ArrayAdapter<String>(context, android.R.layout.simple_spinner_item, options.toMutableList()) {
+        val displayOptions = options.map { t(it) }
+        val adapter = object : ArrayAdapter<String>(context, android.R.layout.simple_spinner_item, displayOptions.toMutableList()) {
             override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
                 val view = (convertView as? TextView) ?: TextView(context)
                 view.text = getItem(position).orEmpty()
@@ -728,8 +847,8 @@ class HomeScreen(
 
     private fun actionButton(label: String, description: String, action: () -> Unit): TextView {
         return TextView(context).apply {
-            text = label
-            contentDescription = description
+            text = t(label)
+            contentDescription = t(description)
             textSize = 13f
             typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
             gravity = Gravity.CENTER
@@ -743,7 +862,7 @@ class HomeScreen(
 
     private fun chip(label: String, color: Int): TextView =
         TextView(context).apply {
-            text = label
+            text = t(label)
             textSize = 9f
             typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
             setTextColor(color)
@@ -763,7 +882,7 @@ class HomeScreen(
         String.format(Locale.US, "%.0f MB", value / 1024.0)
 
     private fun toast(message: String) {
-        android.widget.Toast.makeText(context, message, android.widget.Toast.LENGTH_SHORT).show()
+        android.widget.Toast.makeText(context, t(message), android.widget.Toast.LENGTH_SHORT).show()
     }
 
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
