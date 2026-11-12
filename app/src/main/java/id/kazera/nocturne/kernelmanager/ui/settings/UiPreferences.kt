@@ -7,6 +7,7 @@ object UiPreferences {
     private const val FILE_NAME = "nocturne_ui_preferences"
     private const val KEY_LANGUAGE = "language"
     private const val KEY_REFRESH_INTERVAL = "refresh_interval_seconds"
+    private const val KEY_ADVANCED_MENU = "advanced_kernel_menu_enabled"
 
     fun language(context: Context): String {
         val saved = context.getSharedPreferences(FILE_NAME, Context.MODE_PRIVATE)
@@ -34,6 +35,17 @@ object UiPreferences {
         context.getSharedPreferences(FILE_NAME, Context.MODE_PRIVATE)
             .edit()
             .putInt(KEY_REFRESH_INTERVAL, seconds)
+            .apply()
+    }
+
+    fun advancedMenuEnabled(context: Context): Boolean =
+        context.getSharedPreferences(FILE_NAME, Context.MODE_PRIVATE)
+            .getBoolean(KEY_ADVANCED_MENU, false)
+
+    fun setAdvancedMenuEnabled(context: Context, enabled: Boolean) {
+        context.getSharedPreferences(FILE_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean(KEY_ADVANCED_MENU, enabled)
             .apply()
     }
 
