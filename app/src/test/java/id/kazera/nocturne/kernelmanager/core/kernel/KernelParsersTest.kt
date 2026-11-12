@@ -34,7 +34,7 @@ class KernelParsersTest {
         listOf(
             "/sys/devices/system/cpu/cpufreq/policy0",
             "/sys/devices/system/cpu/cpufreq/policy99/schedutil/../scaling_min_freq",
-            "/sys/devices/system/cpu/cpufreq/policy8/schedutil",
+            "/sys/devices/system/cpu/cpufreq/policyx/schedutil",
             "/sys/devices/system/cpu/cpu8/cpufreq/schedutil",
             "/sys/devices/system/cpu/cpufreq/interactive",
             "/proc/sys/kernel/dyn_fsync/Dyn_fsync_active"
