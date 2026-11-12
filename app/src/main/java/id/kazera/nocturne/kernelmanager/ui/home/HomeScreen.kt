@@ -37,7 +37,9 @@ class HomeScreen(
     private val onRefreshIntervalChanged: (Int) -> Unit,
     private val onGpuMaximumFrequencyApply: (Long) -> Unit,
     private val onCpuCoreToggle: (Int, Boolean) -> Unit,
-    private val onDevfreqRangeApply: (String, Long, Long) -> Unit
+    private val onDevfreqRangeApply: (String, Long, Long) -> Unit,
+    private val onSchedutilTunableApply: (String, String, String) -> Unit,
+    private val onDynamicFsyncApply: (Boolean) -> Unit
 ) : LinearLayout(context) {
 
     private enum class Page(val label: String, val icon: String) {
@@ -130,6 +132,18 @@ class HomeScreen(
         append(data.gpu.numberOfPowerLevels)
         append('|')
         append(data.regulators.map { it.name })
+        append('|')
+        append(data.advancedKernel.schedutilTunables.map {
+            listOf(
+                it.policyPath, it.hispeedLoad, it.hispeedFrequencyKHz,
+                it.upRateLimitUs, it.downRateLimitUs, it.powerLimitEnabled
+            )
+        })
+        append('|')
+        append(data.advancedKernel.dynamicFsyncPath)
+        append('|')
+        append(data.advancedKernel.dynamicFsyncEnabled)
+        append('|')
         append(data.warnings.sorted())
     }
 
@@ -708,6 +722,64 @@ class HomeScreen(
             )
         }
 
+        addCard(container, "SCHEDUTIL TUNABLES", "Live CPU governor controls") { card ->
+            val tunables = data.advancedKernel.schedutilTunables
+            if (tunables.isEmpty()) {
+                addUnsupported(card, "No schedutil tunables exposed.")
+            } else {
+                tunables.forEach { item ->
+                    val policy = data.cpuPolicies.firstOrNull { it.path == item.policyPath }
+                    addText(card, policy?.name ?: item.policyPath.substringAfterLast('/'),
+                        SECONDARY, 12f, bold = true, top = 9)
+                    item.hispeedLoad?.takeIf { it in 0..100 }?.let { current ->
+                        val loadBar = addSeekControl(card, "Hispeed load (%)", current, 0, 100)
+                        card.addView(
+                            actionButton("Apply hispeed load", "Apply schedutil hispeed load") {
+                                if (!data.root.available) toast("Root permission is required.")
+                                else onSchedutilTunableApply(
+                                    item.policyPath,
+                                    "hispeed_load",
+                                    ((loadBar.tag as Int) + loadBar.progress).toString()
+                                )
+                            },
+                            LayoutParams(MATCH_PARENT, dp(42)).apply { topMargin = dp(4) }
+                        )
+                    }
+                    val frequencies = policy?.availableFrequenciesKHz.orEmpty()
+                    item.hispeedFrequencyKHz?.takeIf { it in frequencies }?.let { current ->
+                        addText(card, "Hispeed frequency", SECONDARY, 12f, bold = true, top = 9)
+                        val picker = frequencySpinner(frequencies, current)
+                        card.addView(picker, LayoutParams(MATCH_PARENT, dp(44)))
+                        card.addView(
+                            actionButton("Apply hispeed frequency", "Apply schedutil hispeed frequency") {
+                                if (!data.root.available) toast("Root permission is required.")
+                                else selectedFrequency(picker)?.let { selected ->
+                                    onSchedutilTunableApply(item.policyPath, "hispeed_freq", selected.toString())
+                                }
+                            },
+                            LayoutParams(MATCH_PARENT, dp(42)).apply { topMargin = dp(4) }
+                        )
+                    }
+                    item.upRateLimitUs?.takeIf { it in 0L..1_000_000L }?.let { current ->
+                        addSchedutilRateControl(card, item.policyPath, "up_rate_limit_us", "Up rate limit", current, data.root.available)
+                    }
+                    item.downRateLimitUs?.takeIf { it in 0L..1_000_000L }?.let { current ->
+                        addSchedutilRateControl(card, item.policyPath, "down_rate_limit_us", "Down rate limit", current, data.root.available)
+                    }
+                    item.powerLimitEnabled?.let { enabled ->
+                        addInfoRow(card, "PL flag", if (enabled) "Enabled" else "Disabled")
+                    }
+                }
+            }
+            addText(
+                card,
+                "Hispeed frequency must match the active CPU OPP table. Rate limits are bounded to 0–1,000,000 µs.",
+                MUTED,
+                11f,
+                top = 8
+            )
+        }
+
         addCard(container, "CPU CORE HOTPLUG", "CPU0 protected") { card ->
             if (data.cpuCores.isEmpty()) {
                 addUnsupported(card, "CPU core topology")
@@ -784,6 +856,37 @@ class HomeScreen(
             }
             addText(card, "Only live frequencies are selectable. Kernel-managed bandwidth boosts remain untouched.",
                 MUTED, 11f, top = 8)
+        }
+
+        addCard(container, "DYNAMIC FSYNC", "Optional kernel write policy") { card ->
+            val fsyncState = data.advancedKernel.dynamicFsyncEnabled
+            if (data.advancedKernel.dynamicFsyncPath == null || fsyncState == null) {
+                addUnsupported(card, "Dynamic Fsync runtime node")
+            } else {
+                val row = LinearLayout(context).apply {
+                    orientation = HORIZONTAL
+                    gravity = Gravity.CENTER_VERTICAL
+                }
+                val labels = LinearLayout(context).apply { orientation = VERTICAL }
+                addText(labels, "Defer fsync while screen is on", TEXT, 13f, bold = true)
+                addText(labels, if (fsyncState) "Enabled" else "Disabled", MUTED, 11f, top = 3)
+                row.addView(labels, LayoutParams(0, WRAP_CONTENT, 1f))
+                val toggle = Switch(context).apply {
+                    isChecked = fsyncState
+                    isEnabled = data.root.available
+                    contentDescription = t("Dynamic Fsync")
+                    setOnCheckedChangeListener { _, enabled -> onDynamicFsyncApply(enabled) }
+                }
+                row.addView(toggle, LayoutParams(WRAP_CONTENT, WRAP_CONTENT))
+                card.addView(row, LayoutParams(MATCH_PARENT, WRAP_CONTENT))
+            }
+            addText(
+                card,
+                "Risk: fsync/fdatasync may be deferred until screen-off or reboot. A crash or forced power loss while the screen is on can lose recent writes or corrupt data.",
+                WARNING,
+                11f,
+                top = 9
+            )
         }
 
         addCard(container, "VOLTAGE / CPR") {
@@ -1302,6 +1405,42 @@ class HomeScreen(
 
     private fun addUnsupported(parent: LinearLayout, label: String) {
         addText(parent, t(label) + " · " + t("Unsupported"), MUTED, 12f, top = 5)
+    }
+
+    private fun addSchedutilRateControl(
+        parent: LinearLayout,
+        policyPath: String,
+        tunable: String,
+        label: String,
+        current: Long,
+        rootAvailable: Boolean
+    ) {
+        val presets = listOf(
+            0L, 100L, 250L, 500L, 1_000L, 2_000L, 5_000L,
+            10_000L, 20_000L, 50_000L, 100_000L, 250_000L,
+            500_000L, 1_000_000L
+        )
+        val values = (presets + current).distinct().sorted()
+        addText(parent, label, SECONDARY, 12f, bold = true, top = 9)
+        val labels = values.map { "$it µs" }
+        val picker = spinner(labels, "$current µs")
+        parent.addView(picker, LayoutParams(MATCH_PARENT, dp(44)))
+        parent.addView(
+            actionButton("Apply $label", "Apply schedutil $label") {
+                if (!rootAvailable) {
+                    toast("Root permission is required.")
+                } else {
+                    picker.selectedItem?.toString()
+                        ?.substringBefore(" ")
+                        ?.toLongOrNull()
+                        ?.takeIf { it in 0L..1_000_000L }
+                        ?.let { value ->
+                            onSchedutilTunableApply(policyPath, tunable, value.toString())
+                        }
+                }
+            },
+            LayoutParams(MATCH_PARENT, dp(42)).apply { topMargin = dp(4) }
+        )
     }
 
     private fun addLiveProgress(
