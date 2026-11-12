@@ -622,7 +622,7 @@ class HomeScreen(
                         actionButton("Apply scheduler", "Apply I/O scheduler") {
                             if (!data.root.available) toast("Root permission is required.")
                             else picker.selectedItem?.toString()
-                                ?.takeIf { it != "Keep current" }
+                                ?.takeIf { it != t("Keep current") }
                                 ?.let { onIoApply(scheduler, it) }
                         },
                         LayoutParams(MATCH_PARENT, dp(46)).apply { topMargin = dp(10) }
