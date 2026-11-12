@@ -173,6 +173,7 @@ object UiText {
         "Root permission is required to apply changes." to "Izin root diperlukan untuk menerapkan perubahan.",
         "KERNEL OPTIMIZATION TELEMETRY" to "TELEMETRY OPTIMASI KERNEL",
         "ZRAM compression algorithm" to "Algoritma kompresi ZRAM",
+        "Available ZRAM algorithms" to "Algoritma ZRAM yang tersedia",
         "KSM status" to "Status KSM",
         "Enabled" to "Aktif",
         "Disabled" to "Nonaktif",
@@ -252,7 +253,7 @@ object UiText {
 
     fun translate(context: Context, source: String): String {
         if (UiPreferences.language(context) != "id") return source
-        if (source.startsWith("Core ")) return "Core " + source.removePrefix("Core ")
+        if (source.startsWith("Core ")) return "Inti " + source.removePrefix("Core ")
         return id[source] ?: source
     }
 }
