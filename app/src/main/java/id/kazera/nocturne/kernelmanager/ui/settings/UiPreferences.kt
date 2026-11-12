@@ -259,6 +259,8 @@ object UiText {
         "No supported scheduler found." to "Scheduler yang didukung tidak ditemukan.",
         "No thermal sensor found." to "Sensor termal tidak ditemukan.",
         "No supported CCI/DDR devfreq node found." to "Node devfreq CCI/DDR yang didukung tidak ditemukan.",
+        "Read sectors" to "Sektor dibaca",
+        "Written sectors" to "Sektor ditulis",
         "CPU policy updated. Values are not guaranteed to persist after reboot." to "CPU policy diperbarui. Nilai belum tentu bertahan setelah reboot."
     )
 
