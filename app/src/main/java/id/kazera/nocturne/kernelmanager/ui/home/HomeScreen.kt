@@ -360,7 +360,7 @@ class HomeScreen(
         addCard(container, "ABOUT") { card ->
             addText(card, "Nocturne Kernel Manager", TEXT, 15f, bold = true)
             addText(card, "Target: Samsung Galaxy M11 / A11 · SDM450", SECONDARY, 12f, top = 5)
-            addText(card, "Version 0.2.0", MUTED, 11f, top = 5)
+            addText(card, "Version 0.3.0", MUTED, 11f, top = 5)
             addText(card, "Inspired by established kernel-manager concepts. Hardware controls are exposed only when validated interfaces are present.",
                 MUTED, 11f, top = 9)
         }
