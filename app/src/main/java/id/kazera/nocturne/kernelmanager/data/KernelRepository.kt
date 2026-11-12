@@ -19,6 +19,7 @@ import id.kazera.nocturne.kernelmanager.domain.model.DevfreqInfo
 import id.kazera.nocturne.kernelmanager.domain.model.GpuInfo
 import id.kazera.nocturne.kernelmanager.domain.model.IoSchedulerInfo
 import id.kazera.nocturne.kernelmanager.domain.model.IoUsage
+import id.kazera.nocturne.kernelmanager.domain.model.KernelExtras
 import id.kazera.nocturne.kernelmanager.domain.model.MemoryInfo
 import id.kazera.nocturne.kernelmanager.domain.model.StorageInfo
 import id.kazera.nocturne.kernelmanager.domain.model.ThermalSensor
@@ -51,6 +52,7 @@ class KernelRepository(
         val thermal = discoverThermalSensors()
         val ioSchedulers = discoverIoSchedulers()
         val memory = readMemory()
+        val kernelExtras = readKernelExtras()
         val battery = readBattery(context)
         val storage = readStorage()
         val ioUsage = readIoUsage()
@@ -94,6 +96,7 @@ class KernelRepository(
             ioSchedulers = ioSchedulers,
             thermalSensors = thermal,
             memory = memory,
+            kernelExtras = kernelExtras,
             battery = battery,
             storage = storage,
             networkRxBytes = TrafficStats.getTotalRxBytes().takeIf { it >= 0L },
@@ -473,6 +476,30 @@ class KernelRepository(
             zramMemoryBytes = mmStat.getOrNull(2),
             swappiness = read("/proc/sys/vm/swappiness")?.toIntOrNull(),
             vfsCachePressure = read("/proc/sys/vm/vfs_cache_pressure")?.toIntOrNull()
+        )
+    }
+
+    private fun readKernelExtras(): KernelExtras {
+        val zramAlgorithmText = read("/sys/block/zram0/comp_algorithm").orEmpty()
+        val activeAlgorithm = Regex("\\[([^]]+)]").find(zramAlgorithmText)?.groupValues?.getOrNull(1)
+        val availableAlgorithms = zramAlgorithmText
+            .replace(Regex("\\[[^]]+]"), " ")
+            .split(Regex("\\s+"))
+            .filter { it.matches(Regex("[A-Za-z0-9_-]{1,32}")) }
+            .distinct()
+
+        val ksmRun = read("/sys/kernel/mm/ksm/run")?.toIntOrNull()
+        val ksmPresent = ksmRun != null
+        return KernelExtras(
+            zramCompressionAlgorithm = activeAlgorithm,
+            availableZramCompressionAlgorithms = availableAlgorithms,
+            ksmSupported = ksmPresent,
+            ksmEnabled = ksmRun?.let { it == 1 },
+            ksmPagesShared = read("/sys/kernel/mm/ksm/pages_shared")?.toLongOrNull(),
+            ksmPagesSharing = read("/sys/kernel/mm/ksm/pages_sharing")?.toLongOrNull(),
+            entropyAvailable = read("/proc/sys/kernel/random/entropy_avail")?.toIntOrNull(),
+            entropyReadWakeupThreshold = read("/proc/sys/kernel/random/read_wakeup_threshold")?.toIntOrNull(),
+            entropyWriteWakeupThreshold = read("/proc/sys/kernel/random/write_wakeup_threshold")?.toIntOrNull()
         )
     }
 
