@@ -64,8 +64,7 @@ class HomeScreen(
 
     fun update(value: DeviceSnapshot, forceRender: Boolean = false) {
         snapshot = value
-        if (forceRender || (selectedPage != Page.CPU && selectedPage != Page.IO &&
-                selectedPage != Page.MEMORY && selectedPage != Page.SYSTEM)) {
+        if (forceRender || selectedPage == Page.OVERVIEW || selectedPage == Page.MONITOR) {
             render(restoreScroll = true)
         }
     }
