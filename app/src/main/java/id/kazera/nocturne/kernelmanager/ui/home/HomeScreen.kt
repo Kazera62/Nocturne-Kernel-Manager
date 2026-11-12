@@ -681,14 +681,22 @@ class HomeScreen(
                 addUnsupported(it, "CPU cpufreq policies")
             } else {
                 data.cpuPolicies.forEach { policy ->
-                    addInfoRow(it, policy.name + " · current", DeviceInfo.frequency(policy.currentFrequencyKHz))
-                    addInfoRow(it, "Governor", policy.governor ?: "Unsupported")
-                    addInfoRow(
+                    addLiveInfoRow(it, policy.name + " · current", DeviceInfo.frequency(policy.currentFrequencyKHz)) { current ->
+                        DeviceInfo.frequency(current.cpuPolicies.firstOrNull { item -> item.path == policy.path }?.currentFrequencyKHz)
+                    }
+                    addLiveInfoRow(it, "Governor", policy.governor ?: "Unsupported") { current ->
+                        current.cpuPolicies.firstOrNull { item -> item.path == policy.path }?.governor ?: "Unsupported"
+                    }
+                    addLiveInfoRow(
                         it,
                         "Live frequency range",
                         DeviceInfo.frequency(policy.minFrequencyKHz) + " – " +
                             DeviceInfo.frequency(policy.maxFrequencyKHz)
-                    )
+                    ) { current ->
+                        current.cpuPolicies.firstOrNull { item -> item.path == policy.path }?.let { item ->
+                            DeviceInfo.frequency(item.minFrequencyKHz) + " – " + DeviceInfo.frequency(item.maxFrequencyKHz)
+                        } ?: "Unsupported"
+                    }
                 }
             }
             addText(
@@ -784,20 +792,32 @@ class HomeScreen(
             } else {
                 data.regulators.forEach { regulator ->
                     addText(it, regulator.name, SECONDARY, 12f, bold = true, top = 7)
-                    addInfoRow(
+                    addLiveInfoRow(
                         it,
                         "Current voltage",
                         regulator.voltageMicrovolts?.let { value -> String.format(Locale.US, "%.3f V", value / 1_000_000.0) } ?: "Unsupported"
-                    )
-                    addInfoRow(
+                    ) { current ->
+                        current.regulators.firstOrNull { entry -> entry.name == regulator.name }?.voltageMicrovolts
+                            ?.let { value -> String.format(Locale.US, "%.3f V", value / 1_000_000.0) } ?: "Unsupported"
+                    }
+                    addLiveInfoRow(
                         it,
                         "Voltage range",
                         listOfNotNull(
                             regulator.minimumMicrovolts?.let { value -> String.format(Locale.US, "%.3f", value / 1_000_000.0) },
                             regulator.maximumMicrovolts?.let { value -> String.format(Locale.US, "%.3f", value / 1_000_000.0) }
                         ).takeIf { values -> values.isNotEmpty() }?.joinToString(" – ")?.plus(" V") ?: "Unsupported"
-                    )
-                    addInfoRow(it, "State", regulator.state ?: "Unknown")
+                    ) { current ->
+                        current.regulators.firstOrNull { entry -> entry.name == regulator.name }?.let { entry ->
+                            listOfNotNull(
+                                entry.minimumMicrovolts?.let { value -> String.format(Locale.US, "%.3f", value / 1_000_000.0) },
+                                entry.maximumMicrovolts?.let { value -> String.format(Locale.US, "%.3f", value / 1_000_000.0) }
+                            ).takeIf { values -> values.isNotEmpty() }?.joinToString(" – ")?.plus(" V") ?: "Unsupported"
+                        } ?: "Unsupported"
+                    }
+                    addLiveInfoRow(it, "State", regulator.state ?: "Unknown") { current ->
+                        current.regulators.firstOrNull { entry -> entry.name == regulator.name }?.state ?: "Unknown"
+                    }
                 }
             }
             addText(
