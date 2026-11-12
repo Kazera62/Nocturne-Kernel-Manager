@@ -1,0 +1,45 @@
+name: Bug report
+description: Report a reproducible problem in the application or project setup.
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Report only issues that can be reproduced. Do not include private data or security-sensitive details.
+  - type: input
+    id: device
+    attributes:
+      label: Device model
+      description: Exact model, for example SM-M115F or SM-A115F.
+      placeholder: SM-M115F
+    validations:
+      required: false
+  - type: input
+    id: android
+    attributes:
+      label: Android version
+      placeholder: Android 12 / custom ROM
+    validations:
+      required: false
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What happened?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant build output or logs
+      render: text
+    validations:
+      required: false

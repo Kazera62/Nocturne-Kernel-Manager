@@ -1,0 +1,24 @@
+name: Project request
+description: Propose a project-level improvement or explain a requirement.
+title: "[Request]: "
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or requirement
+      description: Describe the need without prescribing an implementation.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed direction
+    validations:
+      required: false
+  - type: textarea
+    id: device_scope
+    attributes:
+      label: Device and software scope
+      description: Include exact device model, Android version, ROM, and kernel where relevant.
+    validations:
+      required: false
