@@ -16,6 +16,20 @@ object KernelParsers {
             .distinct()
             .sorted()
 
+    fun cpuList(text: String?): List<Int> {
+        val result = sortedSetOf<Int>()
+        text.orEmpty().trim().split(",").forEach { token ->
+            val part = token.trim()
+            if (part.isBlank()) return@forEach
+            val range = part.split("-", limit = 2)
+            val first = range.firstOrNull()?.toIntOrNull() ?: return@forEach
+            val last = range.getOrNull(1)?.toIntOrNull() ?: first
+            if (first < 0 || last < first || last > 255) return@forEach
+            for (cpu in first..last) result += cpu
+        }
+        return result.toList()
+    }
+
     fun gpuUtilization(text: String?): Int? {
         val values = text.orEmpty().trim().split(Regex("\\s+"))
             .mapNotNull { it.toLongOrNull() }
