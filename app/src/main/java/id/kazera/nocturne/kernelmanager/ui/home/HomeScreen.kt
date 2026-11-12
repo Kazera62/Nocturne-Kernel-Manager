@@ -12,6 +12,7 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.SeekBar
 import android.widget.Spinner
+import android.widget.Switch
 import android.widget.TextView
 import id.kazera.nocturne.kernelmanager.core.kernel.KernelParsers
 import id.kazera.nocturne.kernelmanager.data.DeviceInfo
@@ -33,7 +34,8 @@ class HomeScreen(
     private val onShowLogs: () -> Unit,
     private val onRootRefresh: () -> Unit,
     private val onLanguageChanged: (String) -> Unit,
-    private val onRefreshIntervalChanged: (Int) -> Unit
+    private val onRefreshIntervalChanged: (Int) -> Unit,
+    private val onGpuMaximumFrequencyApply: (Long) -> Unit
 ) : LinearLayout(context) {
 
     private enum class Page(val label: String, val icon: String) {
@@ -41,6 +43,7 @@ class HomeScreen(
         PERFORMANCE("Performance", "⚡"),
         MONITOR("Monitor", "◉"),
         SYSTEM("System", "▦"),
+        ADVANCED("Advanced", "⚙"),
         SETTINGS("Settings", "⚙")
     }
 
@@ -100,7 +103,7 @@ class HomeScreen(
                 it.availableFrequenciesKHz, it.availableGovernors)
         })
         append('|')
-        append(data.devfreq.map { it.path })
+        append(data.devfreq.map { listOf(it.path, it.minimumFrequencyHz, it.maximumFrequencyHz, it.availableFrequenciesHz) })
         append('|')
         append(data.ioSchedulers.map { listOf(it.path, it.activeScheduler, it.availableSchedulers) })
         append('|')
@@ -118,6 +121,13 @@ class HomeScreen(
         append('|')
         append(data.gpu.source.orEmpty())
         append('|')
+        append(data.gpu.maximumPowerLevel)
+        append('|')
+        append(data.gpu.minimumPowerLevel)
+        append('|')
+        append(data.gpu.numberOfPowerLevels)
+        append('|')
+        append(data.regulators.map { it.name })
         append(data.warnings.sorted())
     }
 
@@ -168,6 +178,7 @@ class HomeScreen(
                 Page.PERFORMANCE -> data?.let { renderPerformance(content, it) }
                 Page.MONITOR -> data?.let { renderMonitor(content, it) }
                 Page.SYSTEM -> data?.let { renderSystem(content, it) }
+                Page.ADVANCED -> data?.let { renderAdvanced(content, it) }
                 Page.SETTINGS -> renderSettings(content, data)
             }
         }
@@ -218,7 +229,10 @@ class HomeScreen(
             setBackgroundColor(SURFACE)
         }
 
-        Page.values().filter { it != Page.SETTINGS }.forEach { page ->
+        Page.values().filter {
+            it != Page.SETTINGS &&
+                (it != Page.ADVANCED || UiPreferences.advancedMenuEnabled(context))
+        }.forEach { page ->
             val selected = page == selectedPage
             val item = LinearLayout(context).apply {
                 orientation = VERTICAL
@@ -413,6 +427,30 @@ class HomeScreen(
             }
         }
 
+        addCard(container, "Advanced kernel menu") { card ->
+            val row = LinearLayout(context).apply {
+                orientation = HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+            }
+            val labels = LinearLayout(context).apply { orientation = VERTICAL }
+            addText(labels, "Enable advanced controls", TEXT, 13f, bold = true)
+            addText(labels, "GPU OPP limits and kernel telemetry.", MUTED, 11f, top = 3)
+            row.addView(labels, LayoutParams(0, WRAP_CONTENT, 1f))
+            val toggle = Switch(context).apply {
+                isChecked = UiPreferences.advancedMenuEnabled(context)
+                contentDescription = t("Enable advanced controls")
+                setOnCheckedChangeListener { _, enabled ->
+                    UiPreferences.setAdvancedMenuEnabled(context, enabled)
+                    if (!enabled && selectedPage == Page.ADVANCED) {
+                        selectedPage = Page.OVERVIEW
+                    }
+                    render(restoreScroll = true)
+                }
+            }
+            row.addView(toggle, LayoutParams(WRAP_CONTENT, WRAP_CONTENT))
+            card.addView(row, LayoutParams(MATCH_PARENT, WRAP_CONTENT))
+        }
+
         addCard(container, "Root diagnostics") { card ->
             val root = rootStatus ?: data?.root
             addInfoRow(card, "Root access", when (root?.available) {
@@ -431,7 +469,7 @@ class HomeScreen(
         addCard(container, "ABOUT") { card ->
             addText(card, "Nocturne Kernel Manager", TEXT, 15f, bold = true)
             addText(card, "Target: Samsung Galaxy M11 / A11 · SDM450", SECONDARY, 12f, top = 5)
-            addText(card, "Version 0.3.0", MUTED, 11f, top = 5)
+            addText(card, "Version 0.4.0", MUTED, 11f, top = 5)
             addText(card, "Hardware controls require validated kernel interfaces.",
                 MUTED, 11f, top = 9)
         }
@@ -554,6 +592,169 @@ class HomeScreen(
                 addUnsupported(card, "Available governor list")
             }
             if (!data.root.available) addText(card, "Grant root access to apply changes.", WARNING, 11f, top = 8)
+        }
+    }
+
+    private fun renderAdvanced(container: LinearLayout, data: DeviceSnapshot) {
+        addPageHeading(container, "Advanced kernel controls", "Runtime controls from live kernel interfaces.")
+
+        addCard(container, "STABILITY NOTICE") {
+            addText(
+                it,
+                "Higher frequency limits increase power and heat. Instability may cause artifacts, freezes, reboots or data loss. Test gradually and keep thermal protection enabled.",
+                WARNING,
+                12f
+            )
+            addText(
+                it,
+                "Changes are runtime-only and may reset after reboot.",
+                MUTED,
+                11f,
+                top = 7
+            )
+        }
+
+        val frequencies = data.gpu.availableFrequenciesHz.sortedDescending()
+        val maximumLevel = data.gpu.maximumPowerLevel
+        val minimumLevel = data.gpu.minimumPowerLevel
+        val levelCount = data.gpu.numberOfPowerLevels
+        val currentMaximum = maximumLevel?.let {
+            KernelParsers.gpuFrequencyForPowerLevel(frequencies, it)
+        }
+
+        addCard(container, "ADRENO 506 · GPU OPP LIMIT", data.gpu.source ?: "KGSL interface unavailable") { card ->
+            addLiveInfoRow(card, "Current GPU clock", DeviceInfo.frequencyHz(data.gpu.currentFrequencyHz)) {
+                DeviceInfo.frequencyHz(it.gpu.currentFrequencyHz)
+            }
+            addInfoRow(card, "Maximum allowed OPP", currentMaximum?.let { DeviceInfo.frequencyHz(it) } ?: "Unsupported")
+            addInfoRow(card, "Minimum power level", minimumLevel?.toString() ?: "Unsupported")
+            addInfoRow(card, "Power-level entries", levelCount?.toString() ?: "Unsupported")
+            addInfoRow(card, "Live OPP table", frequencies.size.toString())
+
+            val validTable = frequencies.isNotEmpty() &&
+                levelCount == frequencies.size &&
+                maximumLevel != null && maximumLevel in frequencies.indices &&
+                minimumLevel != null && minimumLevel in frequencies.indices &&
+                maximumLevel <= minimumLevel
+            if (validTable) {
+                val selectable = frequencies.take(minimumLevel!! + 1)
+                val labels = selectable.map { DeviceInfo.frequencyHz(it) }
+                val selectedLabel = currentMaximum?.let { DeviceInfo.frequencyHz(it) }
+                val picker = spinner(labels, selectedLabel)
+                card.addView(picker, LayoutParams(MATCH_PARENT, dp(46)).apply { topMargin = dp(8) })
+                card.addView(
+                    actionButton("Apply GPU OPP limit", "Apply GPU maximum operating point") {
+                        val selectedFrequency = selectable.getOrNull(picker.selectedItemPosition)
+                        if (!data.root.available) {
+                            toast("Root permission is required.")
+                        } else if (selectedFrequency != null) {
+                            onGpuMaximumFrequencyApply(selectedFrequency)
+                        } else {
+                            toast("GPU frequency selection is unavailable.")
+                        }
+                    },
+                    LayoutParams(MATCH_PARENT, dp(46)).apply { topMargin = dp(10) }
+                )
+            } else {
+                addUnsupported(card, "KGSL power-level controls")
+                addText(
+                    card,
+                    "The kernel must expose matching gpu_available_frequencies, num_pwrlevels, max_pwrlevel and min_pwrlevel nodes.",
+                    MUTED,
+                    11f,
+                    top = 6
+                )
+            }
+            addText(
+                card,
+                "Uses existing KGSL OPPs only. No new OPP, voltage or regulator value is written; thermal limits remain active.",
+                SECONDARY,
+                11f,
+                top = 9
+            )
+        }
+
+        addCard(container, "CPU FREQUENCY") {
+            if (data.cpuPolicies.isEmpty()) {
+                addUnsupported(it, "CPU cpufreq policies")
+            } else {
+                data.cpuPolicies.forEach { policy ->
+                    addInfoRow(it, policy.name + " · current", DeviceInfo.frequency(policy.currentFrequencyKHz))
+                    addInfoRow(it, "Governor", policy.governor ?: "Unsupported")
+                    addInfoRow(
+                        it,
+                        "Live frequency range",
+                        DeviceInfo.frequency(policy.minFrequencyKHz) + " – " +
+                            DeviceInfo.frequency(policy.maxFrequencyKHz)
+                    )
+                }
+            }
+            addText(
+                it,
+                "Governor and frequency controls are available under Performance. Selection is limited to the live CPU OPP table.",
+                MUTED,
+                11f,
+                top = 8
+            )
+        }
+
+        addCard(container, "CCI / DDR DEVFREQ") {
+            if (data.devfreq.isEmpty()) {
+                addUnsupported(it, "No supported CCI/DDR devfreq node found.")
+            } else {
+                data.devfreq.forEach { item ->
+                    addText(it, item.name, SECONDARY, 12f, bold = true, top = 8)
+                    addInfoRow(it, "Current frequency", DeviceInfo.frequencyHz(item.currentFrequencyHz))
+                    addInfoRow(it, "Minimum exposed", item.minimumFrequencyHz?.let { value -> DeviceInfo.frequencyHz(value) } ?: "Unsupported")
+                    addInfoRow(it, "Maximum exposed", item.maximumFrequencyHz?.let { value -> DeviceInfo.frequencyHz(value) } ?: "Unsupported")
+                    addInfoRow(it, "Available OPP entries", item.availableFrequenciesHz.size.toString())
+                }
+            }
+            addText(
+                it,
+                "This kernel build exposes no verified generic CCI/DDR write adapter. These nodes remain read-only; kernel-managed bandwidth boosts are untouched.",
+                MUTED,
+                11f,
+                top = 8
+            )
+        }
+
+        addCard(container, "VOLTAGE / CPR") {
+            if (data.regulators.isEmpty()) {
+                addUnsupported(it, "Regulator voltage telemetry")
+            } else {
+                data.regulators.forEach { regulator ->
+                    addText(it, regulator.name, SECONDARY, 12f, bold = true, top = 7)
+                    addInfoRow(
+                        it,
+                        "Current voltage",
+                        regulator.voltageMicrovolts?.let { value -> String.format(Locale.US, "%.3f V", value / 1_000_000.0) } ?: "Unsupported"
+                    )
+                    addInfoRow(
+                        it,
+                        "Voltage range",
+                        listOfNotNull(
+                            regulator.minimumMicrovolts?.let { value -> String.format(Locale.US, "%.3f", value / 1_000_000.0) },
+                            regulator.maximumMicrovolts?.let { value -> String.format(Locale.US, "%.3f", value / 1_000_000.0) }
+                        ).takeIf { values -> values.isNotEmpty() }?.joinToString(" – ")?.plus(" V") ?: "Unsupported"
+                    )
+                    addInfoRow(it, "State", regulator.state ?: "Unknown")
+                }
+            }
+            addText(
+                it,
+                "CPU/GPU voltage is managed by Qualcomm CPR, regulator rails and DTB corner tables. No validated runtime undervolt interface is exposed by this kernel build; this section is read-only.",
+                WARNING,
+                11f,
+                top = 9
+            )
+            addText(
+                it,
+                "KonaBess modifies boot-image DTB data and its published device list does not include SDM450. Do not flash its output on M11/A11.",
+                MUTED,
+                11f,
+                top = 7
+            )
         }
     }
 
