@@ -112,7 +112,7 @@ class KernelRepository(
         maxFrequencyKHz: Long
     ): ControlResult {
         if (!rootAccess().available) return ControlResult(false, "Root permission is required.")
-        if (!Regex("^/sys/devices/system/cpu/cpufreq/policy[0-9]+$").matches(policy.path)) {
+        if (!Regex("^/sys/devices/system/cpu/(cpufreq/policy[0-9]+|cpu[0-7]/cpufreq)$").matches(policy.path)) {
             return ControlResult(false, "Rejected unknown CPU policy path.")
         }
         if (minFrequencyKHz <= 0L || maxFrequencyKHz <= 0L ||
