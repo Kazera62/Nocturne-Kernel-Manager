@@ -386,6 +386,13 @@ object UiText {
         "up_rate_limit_us" to "up_rate_limit_us",
         "down_rate_limit_us" to "down_rate_limit_us",
         "Risk: raising hispeed frequency or lowering hispeed load can increase boost activity, power draw and heat. Extreme rate limits may cause sluggish response or frequent frequency changes." to "Risiko: menaikkan frekuensi hispeed atau menurunkan hispeed load dapat meningkatkan boost, konsumsi daya, dan suhu. Batas laju ekstrem dapat membuat respons lambat atau frekuensi terlalu sering berubah.",
+        "Global schedutil tunables" to "Tunable schedutil global",
+        "Per-policy schedutil tunables" to "Tunable schedutil per-policy",
+        "schedutil" to "schedutil",
+        "Hispeed load (%)" to "Beban hispeed (%)",
+        "Up rate limit" to "Batas kenaikan",
+        "Down rate limit" to "Batas penurunan",
+        "Risk: raising hispeed frequency or lowering hispeed load can increase boost activity, power draw and heat. Extreme rate limits may cause sluggish response or frequent frequency changes." to "Risiko: menaikkan frekuensi hispeed atau menurunkan hispeed load dapat meningkatkan boost, konsumsi daya, dan suhu. Batas laju ekstrem dapat membuat respons lambat atau frekuensi terlalu sering berubah.",
         "CPU policy updated. Values are not guaranteed to persist after reboot." to "CPU policy diperbarui. Nilai belum tentu bertahan setelah reboot."
     )
 
