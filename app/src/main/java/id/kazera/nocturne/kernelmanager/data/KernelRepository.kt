@@ -64,13 +64,13 @@ class KernelRepository(
         val uptime = read("/proc/uptime")?.substringBefore(' ')?.toDoubleOrNull()?.toLong()
 
         val warnings = mutableListOf<String>()
-        if (!root.available) warnings += "Root access is unavailable. Read-only public nodes may still be visible."
-        if (cpuPolicies.isEmpty()) warnings += "CPU cpufreq policies were not exposed by this kernel."
+        if (!root.available) warnings += "Root unavailable; public telemetry only."
+        if (cpuPolicies.isEmpty()) warnings += "No CPU frequency policy found."
         if (gpu.currentFrequencyHz == null && gpu.utilizationPercent == null) {
-            warnings += "GPU telemetry nodes were not found. GPU controls are intentionally read-only."
+            warnings += "GPU telemetry unavailable; controls are read-only."
         }
-        if (thermal.isEmpty()) warnings += "No readable thermal zones were detected."
-        if (ioSchedulers.isEmpty()) warnings += "No block I/O scheduler nodes were detected."
+        if (thermal.isEmpty()) warnings += "No thermal zone found."
+        if (ioSchedulers.isEmpty()) warnings += "No supported physical block scheduler found."
 
         val deviceCode = Build.DEVICE.orEmpty().ifBlank { "Unknown" }
         val model = Build.MODEL.orEmpty().ifBlank { "Unknown Android device" }
