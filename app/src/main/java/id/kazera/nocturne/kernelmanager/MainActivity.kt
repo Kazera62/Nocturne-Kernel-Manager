@@ -47,6 +47,8 @@ class MainActivity : Activity() {
                 applyCpu(policy, governor, minimum, maximum)
             },
             onIoApply = { scheduler, selected -> applyIoScheduler(scheduler, selected) },
+            onVmApply = { swappiness, cachePressure -> applyVmSettings(swappiness, cachePressure) },
+            onTcpApply = { selected -> applyTcpCongestionControl(selected) },
             onShowLogs = { showKernelLogs() }
         )
         setContentView(screen)
@@ -104,7 +106,27 @@ class MainActivity : Activity() {
             val result = repository.applyIoScheduler(scheduler, selected)
             runOnUiThread {
                 Toast.makeText(this, result.message, Toast.LENGTH_LONG).show()
-                refresh()
+                refresh(forceRender = true)
+            }
+        }
+    }
+
+    private fun applyVmSettings(swappiness: Int, cachePressure: Int) {
+        worker.execute {
+            val result = repository.applyVmSettings(swappiness, cachePressure)
+            runOnUiThread {
+                Toast.makeText(this, result.message, Toast.LENGTH_LONG).show()
+                refresh(forceRender = true)
+            }
+        }
+    }
+
+    private fun applyTcpCongestionControl(selected: String) {
+        worker.execute {
+            val result = repository.applyTcpCongestionControl(selected)
+            runOnUiThread {
+                Toast.makeText(this, result.message, Toast.LENGTH_LONG).show()
+                refresh(forceRender = true)
             }
         }
     }
