@@ -50,6 +50,22 @@ data class RegulatorTelemetry(
     val state: String?
 )
 
+data class SchedutilTunablesInfo(
+    val policyPath: String,
+    val path: String,
+    val hispeedLoad: Int?,
+    val hispeedFrequencyKHz: Long?,
+    val upRateLimitUs: Long?,
+    val downRateLimitUs: Long?,
+    val powerLimitEnabled: Boolean?
+)
+
+data class AdvancedKernelInfo(
+    val schedutilTunables: List<SchedutilTunablesInfo> = emptyList(),
+    val dynamicFsyncPath: String? = null,
+    val dynamicFsyncEnabled: Boolean? = null
+)
+
 data class ThermalSensor(
     val name: String,
     val temperatureCelsius: Double
@@ -126,5 +142,6 @@ data class DeviceSnapshot(
     val ioUsage: IoUsage,
     val tcpCongestionControl: String?,
     val availableTcpCongestionControls: List<String>,
-    val warnings: List<String>
+    val warnings: List<String>,
+    val advancedKernel: AdvancedKernelInfo = AdvancedKernelInfo()
 )
