@@ -13,6 +13,7 @@ import id.kazera.nocturne.kernelmanager.core.privilege.RootAccess
 import id.kazera.nocturne.kernelmanager.core.privilege.RootShell
 import id.kazera.nocturne.kernelmanager.core.privilege.ShellResult
 import id.kazera.nocturne.kernelmanager.domain.model.BatteryInfo
+import id.kazera.nocturne.kernelmanager.domain.model.CpuCoreInfo
 import id.kazera.nocturne.kernelmanager.domain.model.CpuPolicyInfo
 import id.kazera.nocturne.kernelmanager.domain.model.DeviceSnapshot
 import id.kazera.nocturne.kernelmanager.domain.model.DevfreqInfo
@@ -46,6 +47,7 @@ class KernelRepository(
 
     fun snapshot(context: Context): DeviceSnapshot {
         val root = rootAccess()
+        val cpuCores = discoverCpuCores()
         val cpuPolicies = discoverCpuPolicies()
         val devfreq = discoverDevfreq()
         val gpu = discoverGpu(devfreq)
@@ -90,6 +92,7 @@ class KernelRepository(
                 ?: System.getProperty("os.version").orEmpty().ifBlank { "Unknown" },
             uptimeSeconds = uptime,
             root = root,
+            cpuCores = cpuCores,
             cpuPolicies = cpuPolicies,
             gpu = gpu,
             devfreq = devfreq,
@@ -339,6 +342,17 @@ class KernelRepository(
             .filter { pattern.matches(it.substringAfterLast('/')) }
             .map { File(it) }
             .toList()
+    }
+
+    private fun discoverCpuCores(): List<CpuCoreInfo> {
+        val coreIds = KernelParsers.cpuList(read("/sys/devices/system/cpu/present"))
+        return coreIds.map { core ->
+            val onlineValue = read("/sys/devices/system/cpu/cpu$core/online")?.toIntOrNull()
+            CpuCoreInfo(
+                coreId = core,
+                online = onlineValue?.let { it == 1 } ?: if (core == 0) true else null
+            )
+        }
     }
 
     private fun discoverCpuPolicies(): List<CpuPolicyInfo> {
