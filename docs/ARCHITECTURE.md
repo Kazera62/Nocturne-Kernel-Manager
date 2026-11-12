@@ -62,8 +62,8 @@ DeviceSnapshot contains a single sample for the UI. Nullable fields represent un
 | CPU topology | /sys/devices/system/cpu/present, cpu*/online | CPU0 protected; IDs 1–7 only; at least two online cores retained; read-back required |
 | CPU cpufreq | /sys/devices/system/cpu/cpufreq/policy*, legacy per-CPU cpufreq | Governor and min/max from live lists only |
 | Schedutil | Per-policy `/sys/devices/system/cpu/cpufreq/policyN/schedutil/` or `cpuN/cpufreq/schedutil/`; global `/sys/devices/system/cpu/cpufreq/schedutil/` | Live node discovery; bounded values, common OPP validation for global hispeed_freq, read-back and rollback |
-| GPU | /sys/class/kgsl/kgsl-3d0/gpu_available_frequencies, max_pwrlevel, min_pwrlevel, num_pwrlevels | Maximum power-level selector using a live OPP only; thermal_pwrlevel is never written |
-| CCI / DDR | Matching /sys/class/devfreq/*/available_frequencies, min_freq, max_freq | Writes only when both bound nodes and selected live OPPs exist; path/name allowlist, ordered writes, read-back and rollback |
+| GPU | /sys/class/kgsl/kgsl-3d0/gpu_available_frequencies, max_pwrlevel, min_pwrlevel, num_pwrlevels; recognized /sys/class/devfreq/*/governor | Maximum power-level selector uses a live OPP only; optional governor must be in available_governors; thermal_pwrlevel is never written |
+| CCI / DDR | Matching /sys/class/devfreq/*/available_frequencies, min_freq, max_freq, available_governors and governor | Limits use existing live OPPs; governor must be kernel-advertised; path/name allowlist, read-back and best-effort rollback |
 | Regulator | /sys/class/regulator/regulator*/ | Voltage/range/state telemetry only |
 | Thermal | /sys/class/thermal/thermal_zone*/ | Read-only |
 | Memory / ZRAM | /proc/meminfo, /sys/block/zram0/ | Read-only |
@@ -132,9 +132,9 @@ The reference repository is archived and declares GPL-3.0.
 
 ## Advanced runtime control boundary
 
-The Advanced menu is default-off. Its GPU control maps a selected frequency to the index in the live descending KGSL OPP list, validates it against num_pwrlevels and min_pwrlevel, writes only /sys/class/kgsl/kgsl-3d0/max_pwrlevel, then reads it back and attempts rollback on mismatch. It does not create OPPs or write thermal_pwrlevel.
+The Advanced menu is default-off. Its GPU control maps a selected frequency to the index in the live descending KGSL OPP list, validates it against num_pwrlevels and min_pwrlevel, writes only /sys/class/kgsl/kgsl-3d0/max_pwrlevel, then reads it back and attempts rollback on mismatch. When a recognized KGSL devfreq node exposes available_governors, the app can select one of those governors and verify the result. It does not create OPPs or write thermal_pwrlevel.
 
-CPU hotplug accepts only present secondary cores 1–7; CPU0 cannot be disabled, and the repository rejects a change that would leave fewer than two cores online. CCI/DDR limits are exposed only when available_frequencies, min_freq and max_freq are all readable and the requested bounds exist in the live table. Writes are serialized, ordered to avoid invalid transient ranges, verified and rolled back best-effort.
+CPU hotplug accepts only present secondary cores 1–7; CPU0 cannot be disabled, and the repository rejects a change that would leave fewer than two cores online. CCI/DDR limits are exposed only when available_frequencies, min_freq and max_freq are all readable and the requested bounds exist in the live table. CCI/DDR governors are restricted to each device's available_governors list. Governor updates use a fixed path/name allowlist, read-back and best-effort rollback. Writes are serialized and verified; limit updates are ordered to avoid invalid transient ranges.
 
 Schedutil tunables are discovered only when at least one CPU policy currently uses the schedutil governor. Both per-policy and global tunable directories are scanned and deduplicated by canonical path. hispeed_load is limited to 0–100; per-policy hispeed_freq must exist in that policy's live OPP list, while a global hispeed_freq must be common to every active schedutil policy. Rate limits are limited to 0–1,000,000 µs. The optional WALT PL utilization flag is a validated 0/1 runtime toggle; it controls whether the WALT PL contribution is included in schedutil demand, not a thermal or electrical power ceiling. Writes use an exact tunables-path allowlist, read-back and best-effort rollback. Dynamic Fsync is exposed only when /sys/kernel/dyn_fsync/Dyn_fsync_active is readable; only 0/1 is written and read-back is verified.
 

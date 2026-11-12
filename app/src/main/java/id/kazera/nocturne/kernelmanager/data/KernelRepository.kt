@@ -352,6 +352,53 @@ class KernelRepository(
         return ControlResult(true, "Dynamic Fsync updated for this boot session.")
     }
 
+    fun applyDevfreqGovernor(path: String, selectedGovernor: String): ControlResult {
+        if (!rootAccess().available) return ControlResult(false, "Root permission is required.")
+        if (!KernelParsers.isSupportedDevfreqPath(path)) {
+            return ControlResult(false, "Rejected unknown devfreq path.")
+        }
+        val deviceName = read("$path/name") ?: path.substringAfterLast('/')
+        val isGpu = KernelParsers.isSupportedGpuDevfreqName(deviceName)
+        val isFabric = KernelParsers.isSupportedDevfreqName(deviceName)
+        if (!isGpu && !isFabric) {
+            return ControlResult(false, "Only a detected KGSL GPU or supported CCI/DDR fabric node can be changed.")
+        }
+        if (!KernelParsers.isValidDevfreqGovernor(selectedGovernor)) {
+            return ControlResult(false, "Invalid devfreq governor name.")
+        }
+
+        val available = read("$path/available_governors").orEmpty()
+            .split(Regex("\\s+"))
+            .filter(KernelParsers::isValidDevfreqGovernor)
+            .distinct()
+        if (available.isEmpty()) {
+            return ControlResult(false, "This kernel does not expose an available_governors list.")
+        }
+        if (selectedGovernor !in available) {
+            return ControlResult(false, "The selected governor is not supported by the live kernel interface.")
+        }
+
+        val governorPath = "$path/governor"
+        val previous = read(governorPath)
+            ?: return ControlResult(false, "The current devfreq governor is unavailable.")
+        if (previous == selectedGovernor) {
+            return ControlResult(true, "The requested devfreq governor is already active.")
+        }
+
+        val write = rootShell.writeDevfreqGovernor(path, deviceName, selectedGovernor)
+        if (!write.success) return ControlResult(false, write.error ?: "Devfreq governor update failed.")
+        val verified = read(governorPath)
+        if (verified != selectedGovernor) {
+            if (KernelParsers.isValidDevfreqGovernor(previous) && previous in available) {
+                rootShell.writeDevfreqGovernor(path, deviceName, previous)
+            }
+            return ControlResult(false, "Governor read-back failed; the previous value was restored where possible.")
+        }
+
+        val label = if (isGpu) "GPU" else "Fabric devfreq"
+        return ControlResult(true, "$label governor changed to $selectedGovernor. Kernel thermal limits remain active.")
+    }
+
     fun applyDevfreqLimits(path: String, minimumHz: Long, maximumHz: Long): ControlResult {
         if (!rootAccess().available) return ControlResult(false, "Root permission is required.")
         if (!KernelParsers.isSupportedDevfreqPath(path)) {
@@ -629,7 +676,11 @@ class KernelRepository(
                 governor = read(path + "/governor"),
                 availableFrequenciesHz = KernelParsers.frequencyList(read(path + "/available_frequencies")),
                 minimumFrequencyHz = KernelParsers.longValue(read(path + "/min_freq")),
-                maximumFrequencyHz = KernelParsers.longValue(read(path + "/max_freq"))
+                maximumFrequencyHz = KernelParsers.longValue(read(path + "/max_freq")),
+                availableGovernors = read(path + "/available_governors").orEmpty()
+                    .split(Regex("\\s+"))
+                    .filter(KernelParsers::isValidDevfreqGovernor)
+                    .distinct()
             )
         }.distinctBy { it.path }
     }
@@ -646,11 +697,20 @@ class KernelRepository(
             "/sys/class/devfreq",
             Regex("[A-Za-z0-9_.:@,-]+")
         ).firstOrNull {
-            val name = (read(it.absolutePath + "/name") ?: it.name).lowercase()
-            name.contains("gpu") || name.contains("kgsl")
+            val name = read(it.absolutePath + "/name") ?: it.name
+            KernelParsers.isSupportedGpuDevfreqName(name)
         }
+        val gpuDevfreqPath = gpuDevfreq?.absolutePath
+            ?.takeIf(KernelParsers::isSupportedDevfreqPath)
+        val gpuGovernor = gpuDevfreqPath?.let { read("$it/governor") }
+        val gpuAvailableGovernors = gpuDevfreqPath?.let { path ->
+            read("$path/available_governors").orEmpty()
+                .split(Regex("\\s+"))
+                .filter(KernelParsers::isValidDevfreqGovernor)
+                .distinct()
+        }.orEmpty()
 
-        val selectedPath = gpuPath ?: gpuDevfreq?.absolutePath?.plus("/cur_freq")
+        val selectedPath = gpuPath ?: gpuDevfreqPath?.plus("/cur_freq")
         val frequency = selectedPath?.let { KernelParsers.longValue(read(it)) }
         val busy = KernelParsers.gpuUtilization(read("$kgslBase/gpubusy"))
         val kgslFrequencies = KernelParsers.frequencyList(read("$kgslBase/gpu_available_frequencies"))
@@ -681,7 +741,10 @@ class KernelRepository(
             maximumClockHz = maximumFrequency,
             availableFrequenciesMHz = available.map { (it / 1_000_000L).toInt() }.distinct(),
             minimumClockMHz = minimumFrequency?.let { (it / 1_000_000L).toInt() },
-            maximumClockMHz = maximumFrequency?.let { (it / 1_000_000L).toInt() }
+            maximumClockMHz = maximumFrequency?.let { (it / 1_000_000L).toInt() },
+            devfreqPath = gpuDevfreqPath,
+            governor = gpuGovernor,
+            availableGovernors = gpuAvailableGovernors
         )
     }
 

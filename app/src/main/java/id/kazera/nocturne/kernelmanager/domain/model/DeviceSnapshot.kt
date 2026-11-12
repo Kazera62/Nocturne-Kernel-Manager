@@ -29,7 +29,10 @@ data class GpuInfo(
     val maximumClockHz: Long? = null,
     val availableFrequenciesMHz: List<Int> = emptyList(),
     val minimumClockMHz: Int? = null,
-    val maximumClockMHz: Int? = null
+    val maximumClockMHz: Int? = null,
+    val devfreqPath: String? = null,
+    val governor: String? = null,
+    val availableGovernors: List<String> = emptyList()
 )
 
 data class DevfreqInfo(
@@ -39,7 +42,8 @@ data class DevfreqInfo(
     val governor: String?,
     val availableFrequenciesHz: List<Long>,
     val minimumFrequencyHz: Long? = null,
-    val maximumFrequencyHz: Long? = null
+    val maximumFrequencyHz: Long? = null,
+    val availableGovernors: List<String> = emptyList()
 )
 
 data class RegulatorTelemetry(

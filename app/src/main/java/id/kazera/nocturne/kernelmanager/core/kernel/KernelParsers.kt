@@ -41,6 +41,14 @@ object KernelParsers {
         listOf("cci", "cpubw", "bus", "ddr", "mem", "llcc")
             .any { name.contains(it, ignoreCase = true) }
 
+    /** Only known Qualcomm KGSL devfreq device names are eligible for GPU governor writes. */
+    fun isSupportedGpuDevfreqName(name: String): Boolean =
+        Regex("^(qcom,)?kgsl(-3d0)?$|^gpu$").matches(name.trim().lowercase(Locale.US))
+
+    /** Governor names are accepted only after matching the kernel's live available_governors list. */
+    fun isValidDevfreqGovernor(governor: String): Boolean =
+        Regex("^[A-Za-z0-9_.-]{1,40}$").matches(governor)
+
     fun canChangeCpuOnline(coreId: Int, online: Boolean, onlineCount: Int): Boolean =
         isSupportedCpuHotplugCore(coreId) && (online || onlineCount > 2)
 

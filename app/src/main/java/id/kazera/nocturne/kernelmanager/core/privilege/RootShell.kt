@@ -124,6 +124,16 @@ class RootShell : AutoCloseable {
         return writeNode("$path/$bound", frequencyHz.toString())
     }
 
+    fun writeDevfreqGovernor(path: String, deviceName: String, governor: String): ShellResult {
+        val allowedPath = KernelParsers.isSupportedDevfreqPath(path)
+        val allowedDevice = KernelParsers.isSupportedDevfreqName(deviceName) ||
+            KernelParsers.isSupportedGpuDevfreqName(deviceName)
+        if (!allowedPath || !allowedDevice || !KernelParsers.isValidDevfreqGovernor(governor)) {
+            return rejected("Rejected unsupported devfreq governor target or value.")
+        }
+        return writeNode("$path/governor", governor)
+    }
+
     fun writeIoScheduler(path: String, value: String): ShellResult {
         val allowedPath = Regex(
             "^/sys/block/(mmcblk[0-9]+|sd[a-c]|nvme[0-9]+n[0-9]+)/queue/scheduler$"

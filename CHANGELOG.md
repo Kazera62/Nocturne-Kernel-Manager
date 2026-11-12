@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Added
+- GPU and CCI/DDR devfreq governor selectors when the running kernel exposes a recognized devfreq node and its live available_governors list.
+
+### Safety
+- Devfreq governor writes are restricted to detected KGSL or supported fabric nodes, validated against the live governor list, read back and restored best-effort on mismatch. No GPU OPP, voltage, regulator or thermal-policy data is modified.
+
 ### Fixed
 - Centralize validation for kernel read paths, CCI/DDR devfreq nodes and secondary CPU hotplug limits so the repository and root bridge apply the same guard rules.
 - Update the security policy to describe the controls that are actually writable in 0.4.0.

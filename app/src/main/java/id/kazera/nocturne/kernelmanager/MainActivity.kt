@@ -90,6 +90,9 @@ class MainActivity : Activity() {
             onDevfreqRangeApply = { path, minimum, maximum ->
                 applyDevfreqLimits(path, minimum, maximum)
             },
+            onDevfreqGovernorApply = { path, governor ->
+                applyDevfreqGovernor(path, governor)
+            },
             onSchedutilTunableApply = { policyPath, tunable, value ->
                 applySchedutilTunable(policyPath, tunable, value)
             },
@@ -264,6 +267,16 @@ class MainActivity : Activity() {
     private fun applyCpuCoreOnline(coreId: Int, online: Boolean) {
         ioExecutor.execute {
             val result = repository.applyCpuCoreOnline(coreId, online)
+            runOnUiThread {
+                Toast.makeText(this, UiText.translate(this, result.message), Toast.LENGTH_LONG).show()
+                refresh(forceRender = true)
+            }
+        }
+    }
+
+    private fun applyDevfreqGovernor(path: String, governor: String) {
+        ioExecutor.execute {
+            val result = repository.applyDevfreqGovernor(path, governor)
             runOnUiThread {
                 Toast.makeText(this, UiText.translate(this, result.message), Toast.LENGTH_LONG).show()
                 refresh(forceRender = true)

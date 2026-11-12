@@ -38,6 +38,7 @@ class HomeScreen(
     private val onGpuMaximumFrequencyApply: (Long) -> Unit,
     private val onCpuCoreToggle: (Int, Boolean) -> Unit,
     private val onDevfreqRangeApply: (String, Long, Long) -> Unit,
+    private val onDevfreqGovernorApply: (String, String) -> Unit,
     private val onSchedutilTunableApply: (String, String, String) -> Unit,
     private val onDynamicFsyncApply: (Boolean) -> Unit
 ) : LinearLayout(context) {
@@ -107,7 +108,10 @@ class HomeScreen(
                 it.availableFrequenciesKHz, it.availableGovernors)
         })
         append('|')
-        append(data.devfreq.map { listOf(it.path, it.minimumFrequencyHz, it.maximumFrequencyHz, it.availableFrequenciesHz) })
+        append(data.devfreq.map {
+            listOf(it.path, it.minimumFrequencyHz, it.maximumFrequencyHz,
+                it.availableFrequenciesHz, it.governor, it.availableGovernors)
+        })
         append('|')
         append(data.ioSchedulers.map { listOf(it.path, it.activeScheduler, it.availableSchedulers) })
         append('|')
@@ -130,6 +134,12 @@ class HomeScreen(
         append(data.gpu.minimumPowerLevel)
         append('|')
         append(data.gpu.numberOfPowerLevels)
+        append('|')
+        append(data.gpu.devfreqPath)
+        append('|')
+        append(data.gpu.governor)
+        append('|')
+        append(data.gpu.availableGovernors)
         append('|')
         append(data.regulators.map { it.name })
         append('|')
@@ -348,7 +358,7 @@ class HomeScreen(
             addLiveInfoRow(it, "GPU utilization", data.gpu.utilizationPercent?.let { value -> "$value%" } ?: "Unsupported") { current ->
                 current.gpu.utilizationPercent?.let { value -> "$value%" } ?: "Unsupported"
             }
-            addText(it, "GPU tuning is read-only.", MUTED, 11f, top = 7)
+            addText(it, "GPU governor and maximum OPP controls are available in Advanced when exposed by the kernel.", MUTED, 11f, top = 7)
         }
 
         addCard(container, "MEMORY", "RAM and compressed swap") {
@@ -688,6 +698,39 @@ class HomeScreen(
                 11f,
                 top = 9
             )
+
+            val gpuGovernorPath = data.gpu.devfreqPath
+            if (gpuGovernorPath != null && data.gpu.availableGovernors.isNotEmpty()) {
+                addText(card, "GPU devfreq governor", SECONDARY, 12f, bold = true, top = 12)
+                val governorOptions = data.gpu.availableGovernors
+                val selectedGovernor = data.gpu.governor?.takeIf { it in governorOptions } ?: governorOptions.first()
+                val governorPicker = spinner(governorOptions, selectedGovernor)
+                card.addView(governorPicker, LayoutParams(MATCH_PARENT, dp(44)))
+                card.addView(
+                    actionButton("Apply GPU governor", "Apply kernel-advertised GPU governor") {
+                        val selected = governorPicker.selectedItem?.toString()
+                        if (!data.root.available) toast("Root permission is required.")
+                        else if (selected != null) onDevfreqGovernorApply(gpuGovernorPath, selected)
+                        else toast("GPU governor list is unavailable.")
+                    },
+                    LayoutParams(MATCH_PARENT, dp(42)).apply { topMargin = dp(6) }
+                )
+                addText(
+                    card,
+                    "A performance governor may hold the GPU at a high operating point and increase heat and power. Kernel thermal limits remain active.",
+                    WARNING,
+                    11f,
+                    top = 6
+                )
+            } else {
+                addText(
+                    card,
+                    "GPU governor control is unavailable: this kernel does not expose a recognized KGSL devfreq governor list.",
+                    MUTED,
+                    11f,
+                    top = 9
+                )
+            }
         }
 
         addCard(container, "CPU FREQUENCY") {
@@ -862,6 +905,23 @@ class HomeScreen(
                     addInfoRow(card, "Maximum exposed", item.maximumFrequencyHz?.let { value -> DeviceInfo.frequencyHz(value) } ?: "Unsupported")
                     addInfoRow(card, "Available OPP entries", item.availableFrequenciesHz.size.toString())
 
+                    if (item.availableGovernors.isNotEmpty()) {
+                        addText(card, "Devfreq governor", SECONDARY, 12f, bold = true, top = 8)
+                        val governorOptions = item.availableGovernors
+                        val selectedGovernor = item.governor?.takeIf { it in governorOptions } ?: governorOptions.first()
+                        val governorPicker = spinner(governorOptions, selectedGovernor)
+                        card.addView(governorPicker, LayoutParams(MATCH_PARENT, dp(44)))
+                        card.addView(
+                            actionButton("Apply devfreq governor", "Apply kernel-advertised fabric governor") {
+                                val selected = governorPicker.selectedItem?.toString()
+                                if (!data.root.available) toast("Root permission is required.")
+                                else if (selected != null) onDevfreqGovernorApply(item.path, selected)
+                                else toast("Devfreq governor list is unavailable.")
+                            },
+                            LayoutParams(MATCH_PARENT, dp(42)).apply { topMargin = dp(6) }
+                        )
+                    }
+
                     val values = item.availableFrequenciesHz.distinct().sorted()
                     val currentMin = item.minimumFrequencyHz
                     val currentMax = item.maximumFrequencyHz
@@ -894,7 +954,7 @@ class HomeScreen(
                     }
                 }
             }
-            addText(card, "Only live frequencies are selectable. Kernel-managed bandwidth boosts remain untouched.",
+            addText(card, "Governors are selectable only from each node's live available_governors list. Performance mode may raise sustained power and heat; kernel-managed bandwidth boosts remain untouched.",
                 MUTED, 11f, top = 8)
         }
 

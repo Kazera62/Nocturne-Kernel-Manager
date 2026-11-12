@@ -17,10 +17,10 @@ Target M11/A11 adalah fokus pengembangan. Seluruh varian regional, firmware, ROM
 | Root | Startup root preflight, persistent SU session, status chip, manual re-check |
 | CPU | Per-policy governor, OPP table, current/min/max frequency; optional schedutil tunables when exposed |
 | CPU topology | Present/online monitoring; CPU0 protected and optional hotplug for secondary cores 1–7 |
-| GPU | Adreno/KGSL telemetry and maximum power-level selection from the live OPP table (Advanced menu) |
+| GPU | Adreno/KGSL telemetry, live maximum power-level selection and devfreq governor selection when exposed (Advanced menu) |
 | CPU tuning | Live schedutil hispeed load/frequency, up/down rate limits and optional WALT PL utilization toggle when exposed |
 | Storage policy | Optional Dynamic Fsync runtime toggle when its kernel node exists |
-| CCI / DDR | Devfreq min/max tuning only when writable nodes and matching live OPPs are exposed; otherwise read-only |
+| CCI / DDR | Devfreq min/max and governor selection only when the live nodes, OPPs and available governors are exposed; otherwise read-only |
 | Memory | RAM, ZRAM statistics, swappiness, VFS cache pressure |
 | Kernel extras | ZRAM compression algorithm, KSM status/statistics, entropy readings, optional Dynamic Fsync |
 | Thermal | Detected thermal-zone temperatures |
@@ -37,7 +37,7 @@ Four primary sections are always visible. Advanced is added to the navigation on
 - **Performance** — CPU policy, CPU core topology, VM parameters and I/O scheduler.
 - **Monitor** — GPU/KGSL, CCI/DDR devfreq and thermal sensors.
 - **System** — battery, storage, network, TCP congestion and kernel logs.
-- **Advanced** — hidden by default; GPU maximum OPP, secondary CPU hotplug, validated CCI/DDR limits, schedutil tunables, Dynamic Fsync and read-only regulator telemetry.
+- **Advanced** — hidden by default; GPU maximum OPP and governor, secondary CPU hotplug, validated CCI/DDR limits and governors, schedutil tunables, Dynamic Fsync and read-only regulator telemetry.
 
 The gear icon in the top-right opens **Settings**. Language, refresh preferences and the Advanced menu toggle are stored locally. Advanced remains hidden until enabled.
 
@@ -62,6 +62,7 @@ The bridge targets root managers that provide a standard SU interface, including
 | VFS cache pressure | 10–200 |
 | TCP congestion control | Selected algorithm must be present in the kernel's live available list |
 | GPU maximum OPP | Exact live KGSL OPP mapped to max_pwrlevel; min_pwrlevel and num_pwrlevels rechecked, with read-back and rollback |
+| GPU / CCI / DDR devfreq governor | Recognized GPU/fabric device path, governor must exist in the live available_governors list, read-back and best-effort rollback |
 | CPU hotplug | CPU0 protected; secondary CPU IDs 1–7 only, present/online verification and at least two online cores |
 | CCI/DDR devfreq limits | Only detected fabric paths; min/max must be present in the live available_frequencies table, with ordered writes and rollback |
 | Schedutil | Per-policy or global schedutil nodes; hispeed_load 0–100, hispeed_freq from the common live CPU OPPs, rate limits 0–1,000,000 µs; read-back and rollback |
@@ -83,7 +84,7 @@ SmartPack Kernel Manager is archived and marked GPL-3.0. This project uses the r
 
 ## Safety boundaries
 
-The application exposes only a runtime GPU maximum-OPP selector using existing KGSL power levels. The control cannot add a new GPU OPP or exceed the live kernel table. Thermal power-level limits remain kernel-owned.
+The application exposes a runtime GPU maximum-OPP selector using existing KGSL power levels and, when available, a KGSL devfreq governor selector. The controls cannot add a new GPU OPP or exceed the live kernel table. Thermal power-level limits remain kernel-owned.
 
 The application does not expose:
 - GPU OPP table modification or a frequency above the live kernel table;
@@ -94,7 +95,7 @@ The application does not expose:
 - CPU0 hotplug or disabling cores when only two cores would not remain online;
 - arbitrary shell commands from the UI.
 
-GPU maximum-OPP selection is the only GPU write. CCI/DDR min/max limits are available only when the exact live nodes and OPPs are writable; regulator voltage, KSM, ZRAM algorithm and entropy remain monitoring-only. Schedutil and Dynamic Fsync are conditional runtime controls, shown only when their kernel nodes exist. Schedutil changes can alter ramp-up/ramp-down latency, boost frequency, power draw and thermal load. Dynamic Fsync is opt-in and carries a data-integrity risk if power is lost while writes are deferred. Kernel-side Zygote DDR bandwidth boost, when provided by the running kernel, remains kernel-owned and is not recreated by app polling.
+GPU writes are limited to the existing maximum-OPP selector and a kernel-advertised devfreq governor. CCI/DDR min/max limits and governor selection are available only when exact live nodes and values are exposed; regulator voltage, KSM, ZRAM algorithm and entropy remain monitoring-only. A performance governor can increase sustained power and heat. Schedutil and Dynamic Fsync are conditional runtime controls, shown only when their kernel nodes exist. Schedutil changes can alter ramp-up/ramp-down latency, boost frequency, power draw and thermal load. Dynamic Fsync is opt-in and carries a data-integrity risk if power is lost while writes are deferred. Kernel-side Zygote DDR bandwidth boost, when provided by the running kernel, remains kernel-owned and is not recreated by app polling.
 
 ## Advanced tuning and KonaBess
 
