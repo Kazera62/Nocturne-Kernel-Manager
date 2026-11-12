@@ -90,6 +90,12 @@ class MainActivity : Activity() {
             onDevfreqRangeApply = { path, minimum, maximum ->
                 applyDevfreqLimits(path, minimum, maximum)
             }
+            onSchedutilTunableApply = { policyPath, tunable, value ->
+                applySchedutilTunable(policyPath, tunable, value)
+            },
+            onDynamicFsyncApply = { enabled ->
+                applyDynamicFsync(enabled)
+            }
         )
         setContentView(screen)
         installWindowInsets(screen)
@@ -268,6 +274,26 @@ class MainActivity : Activity() {
     private fun applyDevfreqLimits(path: String, minimumHz: Long, maximumHz: Long) {
         ioExecutor.execute {
             val result = repository.applyDevfreqLimits(path, minimumHz, maximumHz)
+            runOnUiThread {
+                Toast.makeText(this, UiText.translate(this, result.message), Toast.LENGTH_LONG).show()
+                refresh(forceRender = true)
+            }
+        }
+    }
+
+    private fun applySchedutilTunable(policyPath: String, tunable: String, value: String) {
+        ioExecutor.execute {
+            val result = repository.applySchedutilTunable(policyPath, tunable, value)
+            runOnUiThread {
+                Toast.makeText(this, UiText.translate(this, result.message), Toast.LENGTH_LONG).show()
+                refresh(forceRender = true)
+            }
+        }
+    }
+
+    private fun applyDynamicFsync(enabled: Boolean) {
+        ioExecutor.execute {
+            val result = repository.setDynamicFsyncEnabled(enabled)
             runOnUiThread {
                 Toast.makeText(this, UiText.translate(this, result.message), Toast.LENGTH_LONG).show()
                 refresh(forceRender = true)
