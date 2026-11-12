@@ -10,7 +10,7 @@
 - Add unit coverage for allowed kernel read roots, devfreq node paths/names and the two-online-core hotplug minimum.
 
 ### CI
-- Run Android verification on pushes to main and pull requests targeting main, while retaining manual dispatch.
+- Run Android verification on every branch push and pull requests targeting main, while retaining manual dispatch.
 
 ## [0.4.0] - 2026-11-12
 
