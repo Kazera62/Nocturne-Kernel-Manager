@@ -123,7 +123,7 @@ class RootShell : AutoCloseable {
                 session.second.write(command)
                 session.second.newLine()
                 session.second.write(
-                    "__nocturne_status=\\$?; printf '\\n\${marker}:%s\\n' \"\\$__nocturne_status\""
+                    "__nocturne_status=$?; printf '\\n${marker}:%s\\n' \"\$__nocturne_status\""
                 )
                 session.second.newLine()
                 session.second.flush()
