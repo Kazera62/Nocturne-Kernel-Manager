@@ -48,9 +48,11 @@ class HomeScreen(
         render()
     }
 
-    fun update(value: DeviceSnapshot) {
+    fun update(value: DeviceSnapshot, forceRender: Boolean = false) {
         snapshot = value
-        render(restoreScroll = true)
+        if (forceRender || (selectedPage != Page.CPU && selectedPage != Page.IO)) {
+            render(restoreScroll = true)
+        }
     }
 
     private fun render(restoreScroll: Boolean = false) {
@@ -71,7 +73,7 @@ class HomeScreen(
         val content = LinearLayout(context).apply {
             orientation = VERTICAL
         }
-        scroll.addView(content, ScrollView.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
+        scroll.addView(content, ViewGroup.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
         addView(scroll, LayoutParams(MATCH_PARENT, 0, 1f))
 
         val data = snapshot
@@ -518,7 +520,7 @@ class HomeScreen(
 
     private fun spinner(options: List<String>, selected: String?): Spinner {
         val spinner = Spinner(context)
-        val adapter = object : ArrayAdapter<String>(context, android.R.layout.simple_spinner_item, options) {
+        val adapter = object : ArrayAdapter<String>(context, android.R.layout.simple_spinner_item, options.toMutableList()) {
             override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
                 val view = (convertView as? TextView) ?: TextView(context)
                 view.text = getItem(position).orEmpty()
@@ -605,8 +607,8 @@ class HomeScreen(
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 
     companion object {
-        private const val MATCH_PARENT = LayoutParams.MATCH_PARENT
-        private const val WRAP_CONTENT = LayoutParams.WRAP_CONTENT
+        private const val MATCH_PARENT = ViewGroup.LayoutParams.MATCH_PARENT
+        private const val WRAP_CONTENT = ViewGroup.LayoutParams.WRAP_CONTENT
         private const val BACKGROUND = 0xFF080B10.toInt()
         private const val SURFACE = 0xFF111821.toInt()
         private const val SURFACE_ALT = 0xFF182330.toInt()
