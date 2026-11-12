@@ -22,7 +22,6 @@
 - GPU control writes only KGSL max_pwrlevel; it does not add OPPs, change voltage, or modify thermal_pwrlevel.
 - CPU/GPU voltage and CPR remain read-only; no runtime undervolt interface is exposed.
 - CCI/DDR bounds are writable only for discovered fabric nodes and exact live OPP values; regulator, thermal policy and DDR bandwidth boost controls remain read-only.
-- Dynamic Fsync can defer fsync/fdatasync; a crash or power loss while writes are deferred can lose recent data or corrupt files.
 - Higher GPU limits can increase heat and power and may cause artifacts, freezes, reboots or data loss.
 - Schedutil changes can affect latency, responsiveness, power use and thermal behavior.
 - Dynamic Fsync may defer fsync/fdatasync; a crash or forced power loss before deferred writes complete can lose recent data or corrupt the filesystem.
