@@ -247,7 +247,7 @@ class HomeScreen(
             addInfoRow(card, "Available OPP entries", policy.availableFrequenciesKHz.size.toString())
 
             val writablePolicyPath =
-                Regex("^/sys/devices/system/cpu/cpufreq/policy[0-9]+$").matches(policy.path)
+                Regex("^/sys/devices/system/cpu/(cpufreq/policy[0-9]+|cpu[0-7]/cpufreq)$").matches(policy.path)
             if (!writablePolicyPath) {
                 addText(card, "This policy uses a non-standard path. Telemetry is read-only for safety.",
                     MUTED, 11f, top = 10)
