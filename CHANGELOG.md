@@ -31,7 +31,7 @@
 - English and Bahasa Indonesia selection, persisted locally.
 - Configurable telemetry refresh interval: 5, 8, 15 or 30 seconds.
 - Redesigned bottom navigation: Overview, Performance, Monitor and System.
-- CPU core present/online telemetry.
+- CPU core present/online telemetry and guarded secondary-core hotplug.
 - ZRAM compression algorithm and supported-algorithm discovery.
 - KSM status and shared-page telemetry.
 - Entropy pool and wakeup-threshold telemetry.
