@@ -485,7 +485,7 @@ class HomeScreen(
             val writablePolicyPath =
                 Regex("^/sys/devices/system/cpu/(cpufreq/policy[0-9]+|cpu[0-7]/cpufreq)$").matches(policy.path)
             if (!writablePolicyPath) {
-                addText(card, "This policy uses a non-standard path. Telemetry is read-only for safety.",
+                addText(card, "Non-standard policy path; read-only.",
                     MUTED, 11f, top = 10)
             } else if (policy.availableGovernors.isNotEmpty()) {
                 addText(card, "Governor", SECONDARY, 12f, bold = true, top = 12)
@@ -528,7 +528,7 @@ class HomeScreen(
                         LayoutParams(MATCH_PARENT, dp(46)).apply { topMargin = dp(12) }
                     )
                 } else {
-                    addText(card, "Frequency controls hidden because current min/max are missing or do not match the live OPP table.",
+                    addText(card, "Frequency controls unavailable: limits do not match live OPPs.",
                         MUTED, 11f, top = 8)
                 }
             } else {
@@ -559,7 +559,7 @@ class HomeScreen(
         addPageHeading(container, "CCI & DDR fabric", "CCI and DDR devfreq readings.")
         if (data.devfreq.isEmpty()) {
             addCard(container, "Fabric telemetry unavailable") {
-                addUnsupported(it, "No matching CCI, cpubw, bus, DDR, memory or LLCC devfreq node was detected.")
+                addUnsupported(it, "No supported CCI/DDR devfreq node found.")
             }
         } else {
             data.devfreq.forEach { item ->
@@ -637,7 +637,7 @@ class HomeScreen(
                     LayoutParams(MATCH_PARENT, dp(46)).apply { topMargin = dp(12) }
                 )
             } else {
-                addUnsupported(card, "VM tuning nodes or current values outside supported ranges")
+                addUnsupported(card, "VM controls unavailable.")
             }
             if (!data.root.available) addText(card, "Root permission is required to apply changes.", WARNING, 11f, top = 8)
         }
@@ -647,7 +647,7 @@ class HomeScreen(
         addPageHeading(container, "Thermal sensors", "Detected zones; thermal policy is read-only.")
         if (data.thermalSensors.isEmpty()) {
             addCard(container, "Thermal interface unavailable") {
-                addUnsupported(it, "No readable thermal zone temperature node was found.")
+                addUnsupported(it, "No thermal sensor found.")
             }
         } else {
             data.thermalSensors.forEach { sensor ->
@@ -685,7 +685,7 @@ class HomeScreen(
 
         if (data.ioSchedulers.isEmpty()) {
             addCard(container, "I/O scheduler interfaces unavailable") {
-                addUnsupported(it, "No /sys/block/*/queue/scheduler node was readable.")
+                addUnsupported(it, "No supported scheduler found.")
             }
         } else {
             data.ioSchedulers.forEach { scheduler ->
