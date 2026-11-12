@@ -7,7 +7,7 @@
 - KGSL GPU maximum-OPP selection using the running kernel's live gpu_available_frequencies table.
 - Secondary CPU hotplug controls for present CPU IDs 1–7; CPU0 remains protected.
 - CCI/DDR min/max devfreq controls when writable bounds and a live available-frequency table are exposed.
-- Schedutil hispeed/rate-limit tunables and power-limit telemetry when exposed by an active schedutil policy.
+- Schedutil per-policy or global hispeed/rate-limit tunables and power-limit telemetry when exposed by an active schedutil policy.
 - Optional Dynamic Fsync toggle when its exact runtime node is exposed.
 - Regulator voltage, limits and state telemetry where the regulator sysfs nodes are readable.
 - Runtime GPU OPP mapping and CPU hotplug target validation tests.
