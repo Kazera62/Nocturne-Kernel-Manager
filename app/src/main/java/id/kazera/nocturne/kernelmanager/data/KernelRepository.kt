@@ -262,6 +262,13 @@ class KernelRepository(
         return rootShell.kernelLogs()
     }
 
+    fun invalidateRootCache() {
+        synchronized(this) {
+            cachedRoot = null
+            rootCheckedAt = 0L
+        }
+    }
+
     private fun rootAccess(): RootAccess {
         val now = System.nanoTime()
         val cached = cachedRoot
