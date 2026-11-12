@@ -77,7 +77,7 @@ class RootShell : AutoCloseable {
 
     fun writeIoScheduler(path: String, value: String): ShellResult {
         val allowedPath = Regex(
-            "^/sys/block/[A-Za-z0-9_.-]+/queue/scheduler$"
+            "^/sys/block/(mmcblk[0-9]+|sd[a-c]|nvme[0-9]+n[0-9]+)/queue/scheduler$"
         ).matches(path)
         if (!allowedPath || !Regex("^[A-Za-z0-9_.-]{1,40}$").matches(value)) {
             return rejected("Rejected invalid I/O scheduler target or value.")
