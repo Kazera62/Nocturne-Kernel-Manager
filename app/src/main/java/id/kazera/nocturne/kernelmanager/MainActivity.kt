@@ -23,6 +23,7 @@ class MainActivity : Activity() {
     private val worker = Executors.newSingleThreadExecutor()
     private val mainHandler = Handler(Looper.getMainLooper())
     private val refreshInFlight = AtomicBoolean(false)
+    private val rootRecheckInFlight = AtomicBoolean(false)
     private lateinit var screen: HomeScreen
 
     @Volatile
@@ -122,12 +123,7 @@ class MainActivity : Activity() {
     }
 
     private fun recheckRootAndRefresh() {
-        if (!rootInitialized || !refreshInFlight.compareAndSet(false, true)) {
-            if (rootInitialized) {
-                refresh(forceRender = true)
-            }
-            return
-        }
+        if (!rootInitialized || !rootRecheckInFlight.compareAndSet(false, true)) return
         worker.execute {
             repository.invalidateRootCache()
             val access = try {
@@ -140,7 +136,7 @@ class MainActivity : Activity() {
                 )
             }
             runOnUiThread {
-                refreshInFlight.set(false)
+                rootRecheckInFlight.set(false)
                 if (isFinishing) return@runOnUiThread
                 screen.updateRootStatus(access)
                 refresh(forceRender = true)
