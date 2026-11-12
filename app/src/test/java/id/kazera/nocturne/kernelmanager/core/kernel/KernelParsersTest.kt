@@ -105,6 +105,7 @@ class KernelParsersTest {
         assertEquals("mq-deadline", result.first)
         assertEquals(listOf("none", "mq-deadline", "bfq"), result.second)
     }
+
     @Test
     fun allowsOnlyKernelReadRootsAndRejectsTraversal() {
         assertEquals(true, KernelParsers.isAllowedKernelReadPath("/sys/devices/system/cpu/online"))
