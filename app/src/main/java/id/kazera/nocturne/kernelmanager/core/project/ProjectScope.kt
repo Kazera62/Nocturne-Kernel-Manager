@@ -12,6 +12,8 @@ object ProjectScope {
     const val DEVICE_MONITORING_ENABLED = true
     const val CPU_CONTROLS_ENABLED = true
     const val IO_SCHEDULER_CONTROLS_ENABLED = true
+    const val VM_CONTROLS_ENABLED = true
+    const val TCP_CONGESTION_CONTROL_ENABLED = true
 
     const val GPU_WRITE_CONTROLS_ENABLED = false
     const val VOLTAGE_CONTROLS_ENABLED = false
