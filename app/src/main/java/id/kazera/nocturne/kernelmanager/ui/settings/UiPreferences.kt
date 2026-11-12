@@ -379,6 +379,13 @@ object UiText {
         "Schedutil update failed." to "Pembaruan schedutil gagal.",
         "Dynamic Fsync update failed." to "Pembaruan Dynamic Fsync gagal.",
         "Current devfreq limits do not match the live OPP table." to "Batas devfreq saat ini tidak cocok dengan tabel OPP aktif.",
+        "GPU OPP, CPU governor and fsync controls." to "Batas OPP GPU, governor CPU, dan kontrol fsync.",
+        "hispeed_load" to "hispeed_load",
+        "schedutil" to "schedutil",
+        "hispeed_freq" to "hispeed_freq",
+        "up_rate_limit_us" to "up_rate_limit_us",
+        "down_rate_limit_us" to "down_rate_limit_us",
+        "Risk: raising hispeed frequency or lowering hispeed load can increase boost activity, power draw and heat. Extreme rate limits may cause sluggish response or frequent frequency changes." to "Risiko: menaikkan frekuensi hispeed atau menurunkan hispeed load dapat meningkatkan boost, konsumsi daya, dan suhu. Batas laju ekstrem dapat membuat respons lambat atau frekuensi terlalu sering berubah.",
         "CPU policy updated. Values are not guaranteed to persist after reboot." to "CPU policy diperbarui. Nilai belum tentu bertahan setelah reboot."
     )
 
