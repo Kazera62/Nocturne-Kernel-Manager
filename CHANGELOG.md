@@ -7,6 +7,8 @@
 - KGSL GPU maximum-OPP selection using the running kernel's live gpu_available_frequencies table.
 - Secondary CPU hotplug controls for present CPU IDs 1–7; CPU0 remains protected.
 - CCI/DDR min/max devfreq controls when writable bounds and a live available-frequency table are exposed.
+- Schedutil tunables for validated active CPU policies: hispeed load/frequency, rate limits and power-limit flag telemetry.
+- Optional Dynamic Fsync toggle when the exact runtime node is exposed.
 - Regulator voltage, limits and state telemetry where the regulator sysfs nodes are readable.
 - Runtime GPU OPP mapping and CPU hotplug target validation tests.
 
@@ -20,6 +22,7 @@
 - GPU control writes only KGSL max_pwrlevel; it does not add OPPs, change voltage, or modify thermal_pwrlevel.
 - CPU/GPU voltage and CPR remain read-only; no runtime undervolt interface is exposed.
 - CCI/DDR bounds are writable only for discovered fabric nodes and exact live OPP values; regulator, thermal policy and DDR bandwidth boost controls remain read-only.
+- Dynamic Fsync can defer fsync/fdatasync; a crash or power loss while writes are deferred can lose recent data or corrupt files.
 - Higher GPU limits can increase heat and power and may cause artifacts, freezes, reboots or data loss.
 
 ## [0.3.0] - 2026-11-12
