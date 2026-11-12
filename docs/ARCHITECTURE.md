@@ -115,7 +115,7 @@ UI preferences are stored locally with Android SharedPreferences.
 
 The root view applies status-bar, navigation-bar and display-cutout insets from WindowInsets. This keeps the header and bottom navigation inside the device's safe display area.
 
-Overview and Monitor use bound TextViews for changing telemetry values. Snapshot updates are coalesced with postOnAnimation; the view tree is rebuilt only when the discovered device structure changes.
+Overview, Performance, Monitor and System use bound TextViews for changing telemetry values. Snapshot updates are coalesced with postOnAnimation; the view tree is rebuilt only when the discovered device structure or writable capability lists change. Settings is intentionally static between user actions.
 
 ## SmartPack reference
 
