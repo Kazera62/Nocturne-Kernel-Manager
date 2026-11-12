@@ -59,10 +59,10 @@ DeviceSnapshot contains a single sample for the UI. Nullable fields represent un
 
 | Feature | Interface | Write policy |
 | --- | --- | --- |
-| CPU topology | /sys/devices/system/cpu/present, cpu*/online | Read-only |
+| CPU topology | /sys/devices/system/cpu/present, cpu*/online | CPU0 protected; IDs 1–7 only; at least two online cores retained; read-back required |
 | CPU cpufreq | /sys/devices/system/cpu/cpufreq/policy*, legacy per-CPU cpufreq | Governor and min/max from live lists only |
 | GPU | /sys/class/kgsl/kgsl-3d0/gpu_available_frequencies, max_pwrlevel, min_pwrlevel, num_pwrlevels | Maximum power-level selector using a live OPP only; thermal_pwrlevel is never written |
-| CCI / DDR | Matching /sys/class/devfreq/* nodes | Read-only; optional min/max values are telemetry only |
+| CCI / DDR | Matching /sys/class/devfreq/*/available_frequencies, min_freq, max_freq | Writes only when both bound nodes and selected live OPPs exist; path/name allowlist, ordered writes, read-back and rollback |
 | Regulator | /sys/class/regulator/regulator*/ | Voltage/range/state telemetry only |
 | Thermal | /sys/class/thermal/thermal_zone*/ | Read-only |
 | Memory / ZRAM | /proc/meminfo, /sys/block/zram0/ | Read-only |
@@ -131,15 +131,17 @@ The reference repository is archived and declares GPL-3.0.
 
 The Advanced menu is default-off. Its GPU control maps a selected frequency to the index in the live descending KGSL OPP list, validates it against num_pwrlevels and min_pwrlevel, writes only /sys/class/kgsl/kgsl-3d0/max_pwrlevel, then reads it back and attempts rollback on mismatch. It does not create OPPs or write thermal_pwrlevel.
 
+CPU hotplug accepts only present secondary cores 1–7; CPU0 cannot be disabled, and the repository rejects a change that would leave fewer than two cores online. CCI/DDR limits are exposed only when available_frequencies, min_freq and max_freq are all readable and the requested bounds exist in the live table. Writes are serialized, ordered to avoid invalid transient ranges, verified and rolled back best-effort.
+
 The SDM450 source defines Adreno 506 OPPs in DTB data. This app can select only entries exposed by the running kernel. Regulator and CPR voltage data is read-only; no validated runtime undervolt write interface is provided. CCI/DDR limits are also read-only in this release because a generic write interface was not established for this kernel.
 
 ## Safety limits
 
 - No GPU OPP-table modification or frequency above the live OPP table.
 - No voltage overrides, regulator/CPR/corner or power-rail writes.
-- No DDR/RAM overclock or devfreq writes.
+- No DDR/RAM overclock or new devfreq OPP creation; CCI/DDR min/max changes are limited to existing live OPP entries.
 - No thermal trip-point or thermal-protection writes.
-- No CPU hotplug writes.
+- No CPU0 hotplug; secondary CPU hotplug is restricted to IDs 1–7 and keeps at least two cores online.
 - No arbitrary shell command field in the UI.
 - No recreation of the kernel's Zygote DDR bandwidth boost by app polling.
 
