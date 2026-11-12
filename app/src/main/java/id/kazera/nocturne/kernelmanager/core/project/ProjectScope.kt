@@ -17,6 +17,9 @@ object ProjectScope {
     const val IO_SCHEDULER_CONTROLS_ENABLED = true
     const val VM_CONTROLS_ENABLED = true
     const val TCP_CONGESTION_CONTROL_ENABLED = true
+    const val ADVANCED_KERNEL_MENU_ENABLED = true
+    const val CPU_HOTPLUG_CONTROLS_ENABLED = true
+    const val DEVFREQ_LIMIT_CONTROLS_ENABLED = true
 
     const val GPU_WRITE_CONTROLS_ENABLED = true
     const val GPU_MAX_POWER_LEVEL_CONTROL_ENABLED = true
