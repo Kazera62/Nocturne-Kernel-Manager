@@ -82,6 +82,28 @@ class RootShell : AutoCloseable {
         return writeNode("/sys/class/kgsl/kgsl-3d0/max_pwrlevel", level.toString())
     }
 
+    fun writeCpuOnline(coreId: Int, online: Boolean): ShellResult {
+        if (coreId !in 1..7) {
+            return rejected("CPU0 and unsupported CPU IDs cannot be changed.")
+        }
+        return writeNode(
+            "/sys/devices/system/cpu/cpu$coreId/online",
+            if (online) "1" else "0"
+        )
+    }
+
+    fun writeDevfreqLimit(path: String, bound: String, frequencyHz: Long): ShellResult {
+        val nodeName = path.substringAfterLast('/').lowercase()
+        val isFabric = listOf("cci", "cpubw", "bus", "ddr", "mem", "llcc")
+            .any { nodeName.contains(it) }
+        val allowedPath = Regex("^/sys/class/devfreq/[A-Za-z0-9_.:@,-]+$").matches(path)
+        if (!allowedPath || !isFabric || bound !in setOf("min_freq", "max_freq") ||
+            frequencyHz !in 1L..10_000_000_000L) {
+            return rejected("Rejected unsupported devfreq target or value.")
+        }
+        return writeNode("$path/$bound", frequencyHz.toString())
+    }
+
     fun writeIoScheduler(path: String, value: String): ShellResult {
         val allowedPath = Regex(
             "^/sys/block/(mmcblk[0-9]+|sd[a-c]|nvme[0-9]+n[0-9]+)/queue/scheduler$"
