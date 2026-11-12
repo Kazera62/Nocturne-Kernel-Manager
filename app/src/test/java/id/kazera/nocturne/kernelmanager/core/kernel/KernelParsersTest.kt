@@ -47,6 +47,14 @@ class KernelParsersTest {
     }
 
     @Test
+    fun allowsOnlySecondaryCpuHotplugTargets() {
+        (1..7).forEach { assertEquals(true, KernelParsers.isSupportedCpuHotplugCore(it)) }
+        listOf(-1, 0, 8, 255).forEach {
+            assertEquals(false, KernelParsers.isSupportedCpuHotplugCore(it))
+        }
+    }
+
+    @Test
     fun acceptsOnlySupportedWholePhysicalBlockDevices() {
         listOf("mmcblk0", "mmcblk1", "sda", "sdb", "sdc", "nvme0n1", "nvme12n3")
             .forEach { assertEquals(true, KernelParsers.isSupportedIoDevice(it)) }
