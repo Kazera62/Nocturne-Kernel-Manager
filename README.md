@@ -1,151 +1,131 @@
 # Nocturne Kernel Manager
 
-Nocturne Kernel Manager adalah proyek aplikasi Android yang ditujukan untuk
-keluarga perangkat **Samsung Galaxy M11 (SM-M115)** dan
-**Samsung Galaxy A11 (SM-A115)** dengan platform **Qualcomm Snapdragon 450
-(SDM450)**.
+Nocturne Kernel Manager adalah aplikasi Android untuk membantu memantau perangkat dan mengelola interface kernel pada keluarga **Samsung Galaxy M11 (SM-M115)** dan **Samsung Galaxy A11 (SM-A115)** berbasis **Qualcomm Snapdragon 450 / SDM450**.
 
-Proyek ini dikembangkan sebagai aplikasi pendamping untuk perangkat M11/A11.
-Pada tahap awal, fokusnya adalah membangun fondasi aplikasi Android yang rapi,
-mudah dikembangkan, dan memiliki proses build serta pengujian yang konsisten.
+Aplikasi menggunakan pendekatan capability-driven: setiap nilai dan kontrol berasal dari interface yang benar-benar terdeteksi pada perangkat. Node yang tidak tersedia akan ditampilkan sebagai **Unsupported**. Aplikasi tidak membuat nilai contoh dan tidak menganggap semua varian firmware atau kernel memiliki layout sysfs yang sama.
 
-## Status proyek
+## Status
 
-**Tahap saat ini: Android application foundation.**
+**Tahap: core application implementation.**
 
-Yang sudah tersedia:
-- proyek Android berbasis Kotlin;
-- konfigurasi Android Gradle Plugin dan Gradle Wrapper;
-- entry point dan halaman awal aplikasi;
-- identitas visual dasar dengan tema gelap;
-- pemisahan awal antara Activity, UI, dan metadata ruang lingkup proyek;
-- unit test untuk menjaga batas tahap fondasi;
-- dokumentasi arsitektur dan kontribusi;
-- GitHub Actions untuk build dan verifikasi manual.
-
-Belum ada fitur pengelolaan kernel, integrasi root, pemantauan perangkat,
-pengaturan CPU/GPU, kontrol thermal, atau service latar belakang. Aplikasi
-belum menjalankan perintah privileged dan belum membaca maupun mengubah
-interface kernel.
+Aplikasi saat ini menyediakan dashboard pemantauan, pembacaan interface kernel, root bridge berbasis perintah standard su, kontrol CPU cpufreq, kontrol I/O scheduler, dan tampilan log kernel.
 
 ## Target perangkat
 
-| Perangkat | Keluarga model | Platform target |
+| Perangkat | Keluarga model | Target platform |
 | --- | --- | --- |
 | Samsung Galaxy M11 | SM-M115 series | Qualcomm Snapdragon 450 |
 | Samsung Galaxy A11 | SM-A115 series | Qualcomm Snapdragon 450 |
 
-Daftar tersebut adalah target awal proyek, bukan klaim bahwa seluruh SKU
-regional, firmware, ROM, dan versi kernel telah tervalidasi.
+Target perangkat adalah fokus pengembangan, bukan klaim bahwa semua SKU regional, firmware, ROM, atau kernel telah diuji secara fisik.
 
-## Teknologi dan konfigurasi
+## Implementasi saat ini
 
-| Komponen | Versi / konfigurasi |
+| Area | Kemampuan |
 | --- | --- |
-| Bahasa | Kotlin |
-| Android Gradle Plugin | 9.4.0 |
-| Gradle Wrapper | 9.6.0 |
-| JDK | 17 |
-| Compile SDK | Android API 36 |
-| Target SDK | Android API 35 |
-| Minimum SDK | Android API 26 |
-| Application ID | `id.kazera.nocturne.kernelmanager` |
-| Unit test | JUnit 4 |
+| Device | Model, device code, platform, kernel release, uptime |
+| Root | SU-compatible root check dan command bridge |
+| CPU | Per-policy current/min/max frequency, available OPP, governor; apply governor dan frequency limits |
+| GPU | KGSL/devfreq clock, utilization, available OPP bila diekspos; read-only |
+| CCI / DDR | Devfreq current frequency, governor, available frequency entries; read-only |
+| Memory | MemTotal, MemAvailable, ZRAM disk size dan mm_stat |
+| Thermal | Semua thermal zone yang terbaca; read-only |
+| I/O | Disk counters dan per-device scheduler; apply scheduler yang tersedia |
+| Battery | Level, charging state, temperature, voltage, technology |
+| Storage | Data partition total dan available |
+| Network | Android TrafficStats RX/TX counters |
+| Diagnostics | Tampilan 160 baris terakhir dmesg; root diperlukan |
 
-## Struktur repository
+### CPU controls
 
-```text
-.
-├── .editorconfig
-├── .github/
-│   └── workflows/
-│       └── android-ci.yml
-├── app/
-│   ├── build.gradle.kts
-│   └── src/
-│       ├── main/
-│       │   ├── AndroidManifest.xml
-│       │   ├── java/id/kazera/nocturne/kernelmanager/
-│       │   │   ├── MainActivity.kt
-│       │   │   ├── core/project/ProjectScope.kt
-│       │   │   └── ui/home/HomeScreen.kt
-│       │   └── res/
-│       │       ├── drawable/ic_launcher.xml
-│       │       └── values/
-│       │           ├── colors.xml
-│       │           ├── strings.xml
-│       │           └── themes.xml
-│       └── test/
-│           └── java/id/kazera/nocturne/kernelmanager/
-│               └── core/project/ProjectScopeTest.kt
-├── docs/
-│   └── ARCHITECTURE.md
-├── gradle/
-│   └── wrapper/
-│       ├── gradle-wrapper.jar
-│       └── gradle-wrapper.properties
-├── .gitignore
-├── build.gradle.kts
-├── gradle.properties
-├── settings.gradle.kts
-├── gradlew
-├── gradlew.bat
-├── CHANGELOG.md
-├── CONTRIBUTING.md
-└── SECURITY.md
-```
+- Menemukan cpufreq policy secara dinamis.
+- Membaca governor dan frekuensi yang diekspos kernel.
+- Pilihan frekuensi dibatasi pada daftar OPP yang dibaca dari perangkat.
+- Validasi min <= max dan nilai harus menjadi anggota OPP table.
+- Perubahan dilakukan melalui su dan berusaha mengembalikan nilai sebelumnya jika write gagal.
+- Perubahan runtime tidak dijamin bertahan setelah reboot.
 
-Penjelasan batas tanggung jawab package dan arah arsitektur tahap berikutnya
-tersedia di [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+### I/O controls
 
-## Build lokal
+- Menemukan /sys/block/*/queue/scheduler.
+- Menampilkan scheduler aktif dan daftar scheduler yang benar-benar didukung node.
+- Hanya nilai yang terdaftar yang dapat diterapkan.
 
-Buka repository melalui Android Studio dan tunggu Gradle Sync selesai.
+## Root compatibility
 
-Untuk membangun APK debug:
+Root bridge menggunakan antarmuka standard su -c. Desain ini ditujukan agar dapat dipakai dengan root manager yang menyediakan command interface tersebut, seperti Magisk, KernelSU, KernelSU Next, BakaSU, dan APatch. Nama provider yang dilaporkan bergantung pada output versi su; deteksi provider tidak dijadikan syarat untuk menjalankan command.
+
+Kompatibilitas aktual tetap harus diverifikasi pada manager, versi, ROM, dan perangkat yang digunakan. Aplikasi tidak menginstal atau mengganti root manager.
+
+## Layout aplikasi
+
+- **Overview** — ringkasan perangkat, root, CPU, GPU, RAM, dan thermal.
+- **CPU** — governor dan frequency limits per policy.
+- **GPU** — telemetry KGSL/devfreq.
+- **CCI / DDR** — telemetry devfreq untuk interconnect dan memory bus.
+- **Memory** — RAM dan ZRAM.
+- **Thermal** — seluruh sensor yang terdeteksi.
+- **I/O** — disk counters dan scheduler.
+- **System** — battery, storage, network, kernel information, dan dmesg.
+
+UI menggunakan komponen Android native dan tema gelap, tanpa dependency UI eksternal.
+
+## Safety boundaries
+
+Aplikasi **tidak** menyediakan:
+- GPU overclock atau GPU maximum-clock cap;
+- voltage override;
+- regulator, CPR, atau corner scaling changes;
+- DDR/RAM overclock;
+- thermal trip-point edits atau thermal protection disable;
+- arbitrary shell command input dari UI.
+
+GPU OPP dan batas GPU yang didefinisikan kernel dibiarkan apa adanya. Thermal protection tetap dikendalikan kernel dan Android thermal framework. Zygote-triggered DDR bandwidth boost, jika ada pada kernel yang terpasang, tetap menjadi tanggung jawab implementasi kernel dan tidak dibuat ulang oleh polling aplikasi.
+
+Semua interface yang tidak dikenal atau tidak tervalidasi harus tetap read-only / Unsupported.
+
+## Build
+
+Requirements:
+- JDK 17
+- Android SDK Platform 36
+- Android SDK Build Tools 36.0.0
+- Gradle Wrapper 9.6.0
+
+Build debug APK:
 
 ```bash
 ./gradlew assembleDebug
 ```
 
-Untuk menjalankan seluruh pemeriksaan:
+Run checks:
 
 ```bash
 ./gradlew testDebugUnitTest lintDebug assembleDebug
 ```
 
-APK debug dihasilkan di:
-
+Output:
 ```text
 app/build/outputs/apk/debug/app-debug.apk
 ```
 
-Lingkungan build memerlukan JDK 17, Android SDK Platform 36, dan Android SDK
-Build Tools 36.0.0.
+## GitHub Actions
 
-## GitHub Actions — manual
-
-Workflow **Android CI** hanya dijalankan secara manual. Push dan pull request
-tidak memulai workflow secara otomatis.
-
-Untuk menjalankan:
-1. Buka tab **Actions** pada repository.
-2. Pilih workflow **Android CI**.
+Workflow **Android CI** hanya dijalankan manual:
+1. Buka tab **Actions**.
+2. Pilih **Android CI**.
 3. Tekan **Run workflow**.
-4. Pilih branch `main`, lalu jalankan workflow.
+4. Pilih branch main.
 
-Workflow menjalankan unit test, Android lint, dan build APK debug. APK yang
-berhasil dibuat tersedia sebagai artifact selama 14 hari.
+Workflow menjalankan unit tests, Android lint, dan debug APK build. APK yang berhasil dibuat disimpan sebagai artifact selama 14 hari. Push dan pull request tidak menjalankan CI secara otomatis.
 
-## Dokumentasi proyek
+## Repository documentation
 
-- [Architecture](docs/ARCHITECTURE.md) — susunan package, batas tanggung jawab,
-  dan arah arsitektur.
-- [Contributing](CONTRIBUTING.md) — standar perubahan dan verifikasi.
-- [Changelog](CHANGELOG.md) — catatan perubahan.
-- [Security](SECURITY.md) — pelaporan isu keamanan.
+- Architecture — docs/ARCHITECTURE.md
+- Contributing — CONTRIBUTING.md
+- Changelog — CHANGELOG.md
+- Security — SECURITY.md
 
-## Lisensi
+## License
 
-Lisensi repository belum ditetapkan. Sampai lisensi resmi ditambahkan, source
-code mengikuti ketentuan hak cipta default.
+Lisensi repository belum ditetapkan. Sampai lisensi resmi ditambahkan, source code mengikuti ketentuan hak cipta default.

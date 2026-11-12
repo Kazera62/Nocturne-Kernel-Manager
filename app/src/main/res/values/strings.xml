@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Nocturne Kernel Manager</string>
-    <string name="app_subtitle">Samsung Galaxy M11 / Galaxy A11</string>
-    <string name="foundation_status">APPLICATION FOUNDATION · NO DEVICE CONTROLS ENABLED</string>
+    <string name="app_subtitle">Samsung Galaxy M11 / Galaxy A11 · SDM450</string>
 </resources>

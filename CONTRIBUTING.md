@@ -1,32 +1,38 @@
 # Contributing
 
-Panduan ini berlaku untuk pengembangan Nocturne Kernel Manager, aplikasi Android
-yang menargetkan Samsung Galaxy M11 (SM-M115 series) dan Galaxy A11
-(SM-A115 series).
+Panduan ini berlaku untuk Nocturne Kernel Manager, aplikasi Android untuk
+Samsung Galaxy M11 (SM-M115 series) dan Galaxy A11 (SM-A115 series).
 
-## Fokus tahap sekarang
+## Current implementation scope
 
-Repository berada pada tahap **application foundation**. Perubahan saat ini
-harus berfokus pada:
-- struktur dan konfigurasi proyek Android;
-- stabilitas build dan kualitas kode;
-- UI dasar dan resource aplikasi;
-- dokumentasi dan pengujian fondasi.
+Fokus pengembangan:
+- Android UI dan presentation logic;
+- discovery serta parsing kernel interface;
+- root bridge yang dibatasi;
+- controller dengan validasi nilai dan rollback;
+- tes parser, repository behavior, dan dokumentasi.
 
-Jangan memasukkan integrasi root, perintah kernel, akses sysfs/procfs, tuning
-perangkat, pemantauan hardware, atau background service sebagai perubahan
-sampingan pada tahap ini.
+## Safety requirements
 
-## Lingkungan pengembangan
+- Jangan menambahkan arbitrary shell command input ke UI.
+- Jangan mengasumsikan sysfs/procfs path tersedia di semua kernel.
+- Node yang tidak terdeteksi harus menjadi Unsupported, bukan dummy control.
+- Semua write path harus memiliki allow-list dan validasi nilai.
+- Jangan menambahkan GPU overclock/cap, voltage/regulator/CPR/corner writes,
+  DDR overclock, atau thermal-protection bypass.
+- Jangan membuat ulang fitur kernel yang sudah berjalan secara internal melalui
+  polling aplikasi.
+- Jangan mengklaim perangkat telah diuji jika pengujian fisik tidak dilakukan.
+
+## Environment
 
 - JDK 17
 - Android SDK Platform 36
 - Android SDK Build Tools 36.0.0
-- Android Studio yang mendukung Android Gradle Plugin 9.4.0
+- Android Gradle Plugin 9.4.0
+- Gradle Wrapper 9.6.0
 
-## Build dan verifikasi lokal
-
-Jalankan dari root repository:
+## Local verification
 
 ```bash
 ./gradlew testDebugUnitTest
@@ -34,35 +40,18 @@ Jalankan dari root repository:
 ./gradlew assembleDebug
 ```
 
-## Menjalankan CI
+## Manual CI
 
-Workflow GitHub Actions bernama **Android CI** berjalan manual, bukan otomatis
-saat push atau pull request.
+GitHub Actions workflow **Android CI** dijalankan melalui tab Actions:
+**Android CI → Run workflow → main**. Push dan pull request tidak memicu CI.
 
-1. Buka tab **Actions**.
-2. Pilih **Android CI**.
-3. Tekan **Run workflow**.
-4. Pilih branch `main` untuk memverifikasi kondisi utama repository.
+## Commit prefixes
 
-## Standar perubahan
-
-- Satu perubahan harus memiliki tujuan yang jelas.
-- Hindari mencampur refactor yang tidak berkaitan.
-- Perbarui README atau dokumen arsitektur jika struktur berubah.
-- Sertakan screenshot untuk perubahan UI yang terlihat.
-- Jangan menyatakan perangkat telah diuji jika pengujian fisik tidak dilakukan.
-- Jangan mengklaim dukungan semua model, firmware, ROM, atau kernel tanpa
-  validasi.
-
-## Format commit
-
-Gunakan prefix singkat dan deskriptif:
-
-- `build:` konfigurasi Gradle atau build system
-- `ci:` GitHub Actions
-- `docs:` dokumentasi
-- `feat:` fungsi aplikasi
-- `fix:` perbaikan
-- `refactor:` perubahan struktur tanpa perubahan perilaku
-- `test:` pengujian
-- `chore:` pemeliharaan proyek
+- build: Gradle dan build system
+- ci: GitHub Actions
+- docs: dokumentasi
+- feat: fungsi aplikasi
+- fix: perbaikan
+- refactor: perubahan struktur tanpa perubahan perilaku
+- test: pengujian
+- chore: pemeliharaan
