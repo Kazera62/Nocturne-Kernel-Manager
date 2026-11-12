@@ -107,31 +107,36 @@ class MainActivity : Activity() {
     }
 
     private fun installWindowInsets(view: HomeScreen) {
+        val baseLeft = view.paddingLeft
+        val baseTop = view.paddingTop
+        val baseRight = view.paddingRight
+        val baseBottom = view.paddingBottom
+
         view.setOnApplyWindowInsetsListener { target, insets ->
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                val bars = insets.getInsets(
+            val safeInsets = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                insets.getInsets(
                     WindowInsets.Type.statusBars() or
                         WindowInsets.Type.navigationBars() or
                         WindowInsets.Type.displayCutout()
                 )
-                target.setPadding(
-                    target.paddingLeft,
-                    bars.top,
-                    target.paddingRight,
-                    bars.bottom
-                )
             } else {
                 @Suppress("DEPRECATION")
-                val topInset = insets.systemWindowInsetTop
+                val left = insets.systemWindowInsetLeft
                 @Suppress("DEPRECATION")
-                val bottomInset = insets.systemWindowInsetBottom
-                target.setPadding(
-                    target.paddingLeft,
-                    topInset,
-                    target.paddingRight,
-                    bottomInset
-                )
+                val top = insets.systemWindowInsetTop
+                @Suppress("DEPRECATION")
+                val right = insets.systemWindowInsetRight
+                @Suppress("DEPRECATION")
+                val bottom = insets.systemWindowInsetBottom
+                android.graphics.Insets.of(left, top, right, bottom)
             }
+
+            target.setPadding(
+                baseLeft + safeInsets.left,
+                baseTop + safeInsets.top,
+                baseRight + safeInsets.right,
+                baseBottom + safeInsets.bottom
+            )
             insets
         }
         view.requestApplyInsets()
