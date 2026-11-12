@@ -54,6 +54,9 @@ class KernelRepository(
         val battery = readBattery(context)
         val storage = readStorage()
         val ioUsage = readIoUsage()
+        val tcpCongestion = read("/proc/sys/net/ipv4/tcp_congestion_control")
+        val availableTcpCongestion = read("/proc/sys/net/ipv4/tcp_available_congestion_control")
+            .orEmpty().split(Regex("\\s+")).filter { it.matches(Regex("[A-Za-z0-9_-]{1,32}")) }.distinct()
         val uptime = read("/proc/uptime")?.substringBefore(' ')?.toDoubleOrNull()?.toLong()
 
         val warnings = mutableListOf<String>()
@@ -95,6 +98,8 @@ class KernelRepository(
             networkRxBytes = TrafficStats.getTotalRxBytes().takeIf { it >= 0L },
             networkTxBytes = TrafficStats.getTotalTxBytes().takeIf { it >= 0L },
             ioUsage = ioUsage,
+            tcpCongestionControl = tcpCongestion,
+            availableTcpCongestionControls = availableTcpCongestion,
             warnings = warnings
         )
     }
@@ -172,6 +177,46 @@ class KernelRepository(
         }
 
         return ControlResult(true, "CPU policy updated. Values are not guaranteed to persist after reboot.")
+    }
+
+    fun applyVmSettings(swappiness: Int, cachePressure: Int): ControlResult {
+        if (!rootAccess().available) return ControlResult(false, "Root permission is required.")
+        if (swappiness !in 0..100 || cachePressure !in 10..200) {
+            return ControlResult(false, "VM values are outside the allowed range.")
+        }
+        val oldSwappiness = read("/proc/sys/vm/swappiness")?.toIntOrNull()
+        val oldCachePressure = read("/proc/sys/vm/vfs_cache_pressure")?.toIntOrNull()
+        if (oldSwappiness == null || oldCachePressure == null) {
+            return ControlResult(false, "VM tuning nodes are not available on this kernel.")
+        }
+
+        val swapResult = rootShell.writeVmSetting("swappiness", swappiness)
+        if (!swapResult.success) {
+            return ControlResult(false, swapResult.error ?: "Swappiness update failed.")
+        }
+
+        val cacheResult = rootShell.writeVmSetting("vfs_cache_pressure", cachePressure)
+        if (!cacheResult.success) {
+            rootShell.writeVmSetting("vfs_cache_pressure", oldCachePressure)
+            rootShell.writeVmSetting("swappiness", oldSwappiness)
+            return ControlResult(false, cacheResult.error ?: "VM update failed; previous values were restored where possible.")
+        }
+        return ControlResult(true, "VM settings updated for the current boot session.")
+    }
+
+    fun applyTcpCongestionControl(selected: String): ControlResult {
+        if (!rootAccess().available) return ControlResult(false, "Root permission is required.")
+        val available = read("/proc/sys/net/ipv4/tcp_available_congestion_control")
+            .orEmpty().split(Regex("\\s+")).filter { it.isNotBlank() }
+        if (selected !in available) {
+            return ControlResult(false, "The selected TCP congestion algorithm is not exposed by this kernel.")
+        }
+        val result = rootShell.writeTcpCongestionControl(selected)
+        return if (result.success) {
+            ControlResult(true, "TCP congestion control changed to " + selected + ".")
+        } else {
+            ControlResult(false, result.error ?: "TCP congestion control update failed.")
+        }
     }
 
     fun applyIoScheduler(
@@ -368,7 +413,9 @@ class KernelRepository(
             zramDiskBytes = KernelParsers.longValue(read("/sys/block/zram0/disksize")),
             zramOriginalBytes = mmStat.getOrNull(0),
             zramCompressedBytes = mmStat.getOrNull(1),
-            zramMemoryBytes = mmStat.getOrNull(2)
+            zramMemoryBytes = mmStat.getOrNull(2),
+            swappiness = read("/proc/sys/vm/swappiness")?.toIntOrNull(),
+            vfsCachePressure = read("/proc/sys/vm/vfs_cache_pressure")?.toIntOrNull()
         )
     }
 
