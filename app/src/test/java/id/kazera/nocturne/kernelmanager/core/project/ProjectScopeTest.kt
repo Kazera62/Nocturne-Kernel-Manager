@@ -27,6 +27,8 @@ class ProjectScopeTest {
         assertTrue(ProjectScope.ADVANCED_KERNEL_MENU_ENABLED)
         assertTrue(ProjectScope.CPU_HOTPLUG_CONTROLS_ENABLED)
         assertTrue(ProjectScope.DEVFREQ_LIMIT_CONTROLS_ENABLED)
+        assertTrue(ProjectScope.SCHEDUTIL_TUNABLES_ENABLED)
+        assertTrue(ProjectScope.DYNAMIC_FSYNC_CONTROL_ENABLED)
         assertTrue(ProjectScope.GPU_WRITE_CONTROLS_ENABLED)
         assertTrue(ProjectScope.GPU_MAX_POWER_LEVEL_CONTROL_ENABLED)
         assertFalse(ProjectScope.GPU_OPP_TABLE_WRITES_ENABLED)
