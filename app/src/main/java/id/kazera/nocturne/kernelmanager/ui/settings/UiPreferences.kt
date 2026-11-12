@@ -75,7 +75,6 @@ object UiText {
         "Uptime" to "Waktu aktif",
         "Root access" to "Akses root",
         "ROOT CHECK" to "CEK ROOT",
-        "ROOT CHECK" to "CEK ROOT",
         "CPU CORE TOPOLOGY" to "TOPOLOGI CORE CPU",
         "Read-only core online status" to "Status core aktif (hanya baca)",
         "Cores online" to "Core aktif",
@@ -239,7 +238,6 @@ object UiText {
         "Close" to "Tutup",
         "BUILD INFORMATION" to "INFORMASI BUILD",
         "Kernel release" to "Versi kernel",
-        "Settings" to "Pengaturan",
         "Application preferences" to "Preferensi aplikasi",
         "Language" to "Bahasa",
         "App language." to "Bahasa aplikasi.",
@@ -268,9 +266,6 @@ object UiText {
         "GPU telemetry unavailable; controls are read-only." to "Telemetry GPU tidak tersedia; kontrol hanya-baca.",
         "No thermal zone found." to "Zona termal tidak ditemukan.",
         "No supported physical block scheduler found." to "Scheduler block device fisik tidak ditemukan.",
-        "No supported scheduler found." to "Scheduler yang didukung tidak ditemukan.",
-        "No thermal sensor found." to "Sensor termal tidak ditemukan.",
-        "No supported CCI/DDR devfreq node found." to "Node devfreq CCI/DDR yang didukung tidak ditemukan.",
         "Read sectors" to "Sektor dibaca",
         "Written sectors" to "Sektor ditulis",
         "Advanced" to "Lanjutan",
@@ -317,13 +312,20 @@ object UiText {
         "GPU maximum OPP set to " to "OPP maksimum GPU diatur ke ",
         "Thermal and voltage controls remain kernel-managed." to "Kontrol termal dan tegangan tetap dikelola kernel.",
         "GPU power-level read-back failed; previous limit was restored where possible." to "Baca ulang power level GPU gagal; batas sebelumnya dipulihkan bila memungkinkan.",
-        "Version 0.4.0" to "Versi 0.4.0",
         "CPU policy updated. Values are not guaranteed to persist after reboot." to "CPU policy diperbarui. Nilai belum tentu bertahan setelah reboot."
     )
 
     fun translate(context: Context, source: String): String {
         if (UiPreferences.language(context) != "id") return source
         if (source.startsWith("Core ")) return "Inti " + source.removePrefix("Core ")
+        val gpuUpdatePrefix = "GPU maximum OPP set to "
+        if (source.startsWith(gpuUpdatePrefix)) {
+            return "OPP maksimum GPU diatur ke " +
+                source.removePrefix(gpuUpdatePrefix).replace(
+                    "Thermal and voltage controls remain kernel-managed.",
+                    "Kontrol termal dan tegangan tetap dikelola kernel."
+                )
+        }
         return id[source] ?: source
     }
 }
