@@ -375,6 +375,9 @@ class KernelRepository(
         if (oldMin == null || oldMax == null) {
             return ControlResult(false, "Writable min_freq/max_freq nodes are not exposed.")
         }
+        if (oldMin > oldMax || oldMin !in liveFrequencies || oldMax !in liveFrequencies) {
+            return ControlResult(false, "Current devfreq limits do not match the live OPP table.")
+        }
         if (oldMin == minimumHz && oldMax == maximumHz) {
             return ControlResult(true, "Devfreq range is already set.")
         }
