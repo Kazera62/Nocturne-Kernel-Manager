@@ -16,9 +16,9 @@ Target M11/A11 adalah fokus pengembangan. Seluruh varian regional, firmware, ROM
 | --- | --- |
 | Root | Startup root preflight, persistent SU session, status chip, manual re-check |
 | CPU | Per-policy governor, OPP table, current/min/max frequency |
-| CPU topology | Present/online core monitoring |
+| CPU topology | Present/online monitoring; CPU0 protected and optional hotplug for secondary cores 1–7 |
 | GPU | Adreno/KGSL telemetry and maximum power-level selection from the live OPP table (Advanced menu) |
-| CCI / DDR | Devfreq telemetry and exposed min/max readings (read-only) |
+| CCI / DDR | Devfreq telemetry and min/max tuning when writable nodes and live OPPs are exposed |
 | Memory | RAM, ZRAM statistics, swappiness, VFS cache pressure |
 | Kernel extras | ZRAM compression algorithm, KSM status/statistics, entropy readings |
 | Thermal | Detected thermal-zone temperatures |
@@ -35,7 +35,7 @@ The navigation is divided into four main areas:
 - **Performance** — CPU policy, CPU core topology, VM parameters and I/O scheduler.
 - **Monitor** — GPU/KGSL, CCI/DDR devfreq and thermal sensors.
 - **System** — battery, storage, network, TCP congestion and kernel logs.
-- **Advanced** — hidden by default; KGSL maximum OPP selection, regulator voltage telemetry and CCI/DDR status.
+- **Advanced** — hidden by default; GPU maximum OPP, secondary CPU hotplug, validated CCI/DDR limits and read-only regulator telemetry.
 
 The gear icon in the top-right opens **Settings**. Language, refresh preferences and the Advanced menu toggle are stored locally. Advanced remains hidden until enabled.
 
@@ -59,7 +59,9 @@ The bridge targets root managers that provide a standard SU interface, including
 | VM swappiness | 0–100 |
 | VFS cache pressure | 10–200 |
 | TCP congestion control | Selected algorithm must be present in the kernel's live available list |
-| GPU maximum OPP | Exact KGSL gpu_available_frequencies entry mapped to a valid max_pwrlevel; current min_pwrlevel and num_pwrlevels are rechecked, with read-back and rollback |
+| GPU maximum OPP | Exact live KGSL OPP mapped to max_pwrlevel; min_pwrlevel and num_pwrlevels rechecked, with read-back and rollback |
+| CPU hotplug | CPU0 protected; secondary CPU IDs 1–7 only, present/online verification and at least two online cores |
+| CCI/DDR devfreq limits | Only detected fabric paths; min/max must be present in the live available_frequencies table, with ordered writes and rollback |
 
 These are runtime controls. The app does not guarantee that settings persist across reboot.
 
@@ -83,12 +85,12 @@ The application does not expose:
 - GPU OPP table modification or a frequency above the live kernel table;
 - voltage overrides, regulator writes or undervolting;
 - CPR/corner scaling changes;
-- DDR/RAM overclocking;
+- DDR/RAM overclocking or new devfreq OPP creation;
 - thermal trip-point changes or thermal-protection bypass;
-- CPU hotplug writes in this release;
+- CPU0 hotplug or hotplug of the final online core;
 - arbitrary shell commands from the UI.
 
-GPU maximum-OPP selection is the only new GPU write. CCI/DDR, regulator voltage, KSM, ZRAM algorithm and entropy remain monitoring-only. Kernel-side Zygote DDR bandwidth boost, when provided by the running kernel, remains kernel-owned and is not recreated by app polling.
+GPU maximum-OPP selection is the only GPU write. CCI/DDR min/max limits are available only when the exact live nodes and OPPs are writable; regulator voltage, KSM, ZRAM algorithm and entropy remain monitoring-only. Kernel-side Zygote DDR bandwidth boost, when provided by the running kernel, remains kernel-owned and is not recreated by app polling.
 
 ## Advanced tuning and KonaBess
 
