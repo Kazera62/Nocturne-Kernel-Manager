@@ -22,6 +22,16 @@ class KernelParsersTest {
     }
 
     @Test
+    fun mapsKgslFrequenciesToDescendingPowerLevels() {
+        val frequencies = listOf(133_300_000L, 216_000_000L, 400_000_000L, 650_000_000L, 824_000_000L)
+        assertEquals(0, KernelParsers.gpuPowerLevelForFrequency(frequencies, 824_000_000L))
+        assertEquals(3, KernelParsers.gpuPowerLevelForFrequency(frequencies, 216_000_000L))
+        assertEquals(null, KernelParsers.gpuPowerLevelForFrequency(frequencies, 747_000_000L))
+        assertEquals(650_000_000L, KernelParsers.gpuFrequencyForPowerLevel(frequencies, 1))
+        assertEquals(null, KernelParsers.gpuFrequencyForPowerLevel(frequencies, 9))
+    }
+
+    @Test
     fun rejectsInvalidGpuUtilization() {
         assertNull(KernelParsers.gpuUtilization("not-a-counter"))
         assertNull(KernelParsers.gpuUtilization("100 0"))
