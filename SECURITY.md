@@ -26,10 +26,13 @@ best-effort rollback if a write or verification fails.
   cores online.
 - **GPU/KGSL:** maximum power-level selection mapped to the running kernel's
   existing `gpu_available_frequencies` table. The app writes only
-  `max_pwrlevel`; it does not create or modify OPP entries.
+  `max_pwrlevel`; it does not create or modify OPP entries. When a recognized
+  KGSL devfreq node exposes `available_governors`, the governor can also be
+  selected from that live list.
 - **CCI/DDR fabric devfreq:** minimum/maximum limits only when the detected
   fabric node exposes readable bounds and a live `available_frequencies`
-  table. Selected values must exist in that table.
+  table. Selected values must exist in that table. Governor selection is
+  similarly limited to the node's live `available_governors` list.
 - **Schedutil:** exposed `hispeed_load`, `hispeed_freq`,
   `up_rate_limit_us`, `down_rate_limit_us` and optional WALT PL flag,
   subject to bounded values and live CPU OPP validation.
@@ -51,8 +54,9 @@ The following remain monitoring-only:
 - Regulator voltage, voltage limits and regulator state.
 - Thermal-zone readings and thermal policy/trip points.
 - CPU topology telemetry, except the guarded secondary-core hotplug control.
-- GPU telemetry other than the KGSL maximum power-level selector.
-- CCI/DDR telemetry other than the conditional min/max controls above.
+- GPU telemetry other than the KGSL maximum power-level and conditional
+  devfreq governor selectors above.
+- CCI/DDR telemetry other than the conditional min/max and governor selectors above.
 - ZRAM compression algorithm, KSM status/statistics and entropy readings.
 - Battery, storage, network counters, uptime, kernel release and kernel logs.
 
@@ -62,7 +66,8 @@ The app does not expose:
 
 - Arbitrary shell-command input in the UI.
 - GPU OPP-table modification, creation of new OPPs, or a frequency outside
-  the live kernel OPP table.
+  the live kernel OPP table. Devfreq governor selection never adds OPPs or
+  overrides the driver's voltage/frequency table.
 - GPU/CPU voltage overrides, regulator writes, undervolting, or CPR/corner
   scaling writes.
 - DDR/RAM overclocking, new devfreq OPP creation, or changes to kernel-owned
@@ -76,7 +81,9 @@ Dynamic Fsync can defer `fsync`/`fdatasync` while the display is on. A kernel
 crash or forced power loss before deferred writes complete can lose recent
 data or corrupt the filesystem. GPU, CPU, schedutil and fabric tuning can
 increase heat or power use and may cause instability, freezes, reboots or
-data loss. Keep thermal protection enabled and make gradual changes.
+data loss. Selecting a `performance` devfreq governor can sustain a higher
+operating point and should be treated as a high-power setting. Keep thermal
+protection enabled and make gradual changes.
 
 ## Reporting
 
