@@ -10,6 +10,9 @@ object ProjectScope {
 
     const val ROOT_BRIDGE_ENABLED = true
     const val DEVICE_MONITORING_ENABLED = true
+    const val CPU_TOPOLOGY_MONITORING_ENABLED = true
+    const val KERNEL_EXTRAS_MONITORING_ENABLED = true
+    const val BILINGUAL_UI_ENABLED = true
     const val CPU_CONTROLS_ENABLED = true
     const val IO_SCHEDULER_CONTROLS_ENABLED = true
     const val VM_CONTROLS_ENABLED = true
