@@ -64,7 +64,7 @@ The bridge targets root managers that provide a standard SU interface, including
 | GPU maximum OPP | Exact live KGSL OPP mapped to max_pwrlevel; min_pwrlevel and num_pwrlevels rechecked, with read-back and rollback |
 | CPU hotplug | CPU0 protected; secondary CPU IDs 1–7 only, present/online verification and at least two online cores |
 | CCI/DDR devfreq limits | Only detected fabric paths; min/max must be present in the live available_frequencies table, with ordered writes and rollback |
-| Schedutil | Active schedutil policies only; hispeed_load 0–100, hispeed_freq from live CPU OPPs, rate limits 0–1,000,000 µs; read-back and rollback |
+| Schedutil | Per-policy or global schedutil nodes; hispeed_load 0–100, hispeed_freq from the common live CPU OPPs, rate limits 0–1,000,000 µs; read-back and rollback |
 | Dynamic Fsync | Exact runtime node, 0/1 values, read-back and rollback; may defer fsync/fdatasync and risk recent writes |
 
 These are runtime controls. The app does not guarantee that settings persist across reboot.
