@@ -14,6 +14,8 @@ to a small list of known kernel nodes and validated values.
 - CPU cpufreq governor and scaling min/max values from a detected policy and
   its exposed OPP/governor lists.
 - Block I/O scheduler values listed by the matching scheduler node.
+- VM swappiness (0–100) and VFS cache pressure (10–200).
+- TCP congestion algorithm listed by the kernel's available algorithm node.
 
 GPU, voltage, regulator, CPR/corner, DDR overclock and thermal-protection
 interfaces are not writable through the app.
