@@ -22,6 +22,7 @@ import id.kazera.nocturne.kernelmanager.domain.model.IoSchedulerInfo
 import id.kazera.nocturne.kernelmanager.domain.model.IoUsage
 import id.kazera.nocturne.kernelmanager.domain.model.KernelExtras
 import id.kazera.nocturne.kernelmanager.domain.model.MemoryInfo
+import id.kazera.nocturne.kernelmanager.domain.model.RegulatorTelemetry
 import id.kazera.nocturne.kernelmanager.domain.model.StorageInfo
 import id.kazera.nocturne.kernelmanager.domain.model.ThermalSensor
 import java.io.File
@@ -51,6 +52,7 @@ class KernelRepository(
         val cpuPolicies = discoverCpuPolicies()
         val devfreq = discoverDevfreq()
         val gpu = discoverGpu(devfreq)
+        val regulators = discoverRegulators()
         val thermal = discoverThermalSensors()
         val ioSchedulers = discoverIoSchedulers()
         val memory = readMemory()
@@ -95,6 +97,7 @@ class KernelRepository(
             cpuCores = cpuCores,
             cpuPolicies = cpuPolicies,
             gpu = gpu,
+            regulators = regulators,
             devfreq = devfreq,
             ioSchedulers = ioSchedulers,
             thermalSensors = thermal,
@@ -199,6 +202,63 @@ class KernelRepository(
         }
 
         return ControlResult(true, "CPU policy updated. Values are not guaranteed to persist after reboot.")
+    }
+
+    /**
+     * Sets the highest GPU power level permitted by KGSL, using only existing
+     * OPP entries exported by this exact SDM450 KGSL driver.
+     *
+     * This does not add OPPs, change voltage/corners, or touch thermal_pwrlevel.
+     */
+    fun applyGpuMaximumFrequency(selectedFrequencyHz: Long): ControlResult {
+        if (!rootAccess().available) return ControlResult(false, "Root permission is required.")
+        val base = "/sys/class/kgsl/kgsl-3d0"
+        val frequencyPath = "$base/gpu_available_frequencies"
+        val maximumPath = "$base/max_pwrlevel"
+        val minimumPath = "$base/min_pwrlevel"
+        val countPath = "$base/num_pwrlevels"
+
+        val liveFrequencies = KernelParsers.frequencyList(read(frequencyPath)).sortedDescending()
+        val numberOfLevels = read(countPath)?.toIntOrNull()
+        val minimumLevel = read(minimumPath)?.toIntOrNull()
+        val oldMaximumLevel = read(maximumPath)?.toIntOrNull()
+        if (liveFrequencies.isEmpty() || numberOfLevels == null ||
+            minimumLevel == null || oldMaximumLevel == null) {
+            return ControlResult(false, "KGSL power-level controls are unavailable.")
+        }
+        if (numberOfLevels != liveFrequencies.size) {
+            return ControlResult(false, "KGSL OPP list and power-level count do not match.")
+        }
+
+        val selectedLevel = liveFrequencies.indexOf(selectedFrequencyHz)
+        if (selectedLevel < 0 || selectedLevel >= numberOfLevels) {
+            return ControlResult(false, "Selected GPU frequency is not in the live OPP table.")
+        }
+        if (selectedLevel > minimumLevel) {
+            return ControlResult(false, "Selected GPU limit conflicts with the current minimum power level.")
+        }
+        if (oldMaximumLevel !in 0 until numberOfLevels) {
+            return ControlResult(false, "Current KGSL maximum power level is invalid.")
+        }
+        if (selectedLevel == oldMaximumLevel) {
+            return ControlResult(true, "GPU maximum OPP is already set to the selected frequency.")
+        }
+
+        val write = rootShell.writeGpuMaxPowerLevel(selectedLevel)
+        if (!write.success) {
+            return ControlResult(false, write.error ?: "GPU maximum OPP update failed.")
+        }
+        val verified = read(maximumPath)?.toIntOrNull()
+        if (verified != selectedLevel) {
+            rootShell.writeGpuMaxPowerLevel(oldMaximumLevel)
+            return ControlResult(false, "GPU power-level read-back failed; previous limit was restored where possible.")
+        }
+
+        val mhz = selectedFrequencyHz / 1_000_000L
+        return ControlResult(
+            true,
+            "GPU maximum OPP set to $mhz MHz. Thermal and voltage controls remain kernel-managed."
+        )
     }
 
     fun applyVmSettings(swappiness: Int, cachePressure: Int): ControlResult {
@@ -411,15 +471,18 @@ class KernelRepository(
                 path = path,
                 currentFrequencyHz = KernelParsers.longValue(read(path + "/cur_freq")),
                 governor = read(path + "/governor"),
-                availableFrequenciesHz = KernelParsers.frequencyList(read(path + "/available_frequencies"))
+                availableFrequenciesHz = KernelParsers.frequencyList(read(path + "/available_frequencies")),
+                minimumFrequencyHz = KernelParsers.longValue(read(path + "/min_freq")),
+                maximumFrequencyHz = KernelParsers.longValue(read(path + "/max_freq"))
             )
         }.distinctBy { it.path }
     }
 
     private fun discoverGpu(devfreq: List<DevfreqInfo>): GpuInfo {
+        val kgslBase = "/sys/class/kgsl/kgsl-3d0"
         val kgslPaths = listOf(
-            "/sys/class/kgsl/kgsl-3d0/gpuclk",
-            "/sys/class/kgsl/kgsl-3d0/devfreq/cur_freq",
+            "$kgslBase/gpuclk",
+            "$kgslBase/devfreq/cur_freq",
             "/sys/class/devfreq/kgsl-3d0/cur_freq"
         )
         val gpuPath = kgslPaths.firstOrNull { !read(it).isNullOrBlank() }
@@ -433,19 +496,63 @@ class KernelRepository(
 
         val selectedPath = gpuPath ?: gpuDevfreq?.absolutePath?.plus("/cur_freq")
         val frequency = selectedPath?.let { KernelParsers.longValue(read(it)) }
-        val busy = KernelParsers.gpuUtilization(read("/sys/class/kgsl/kgsl-3d0/gpubusy"))
-        val available = if (gpuDevfreq != null) {
-            KernelParsers.frequencyList(read(gpuDevfreq.absolutePath + "/available_frequencies"))
-        } else {
-            KernelParsers.frequencyList(read("/sys/class/kgsl/kgsl-3d0/gpu_available_frequencies"))
+        val busy = KernelParsers.gpuUtilization(read("$kgslBase/gpubusy"))
+        val kgslFrequencies = KernelParsers.frequencyList(read("$kgslBase/gpu_available_frequencies"))
+        val available = kgslFrequencies.ifEmpty {
+            gpuDevfreq?.let {
+                KernelParsers.frequencyList(read(it.absolutePath + "/available_frequencies"))
+            }.orEmpty()
         }
+        val descending = available.sortedDescending()
+        val maximumPowerLevel = read("$kgslBase/max_pwrlevel")?.toIntOrNull()
+        val minimumPowerLevel = read("$kgslBase/min_pwrlevel")?.toIntOrNull()
+        val numberOfPowerLevels = read("$kgslBase/num_pwrlevels")?.toIntOrNull()
+        val maximumFrequency = maximumPowerLevel
+            ?.takeIf { it in descending.indices }
+            ?.let { descending[it] }
+        val minimumFrequency = minimumPowerLevel
+            ?.takeIf { it in descending.indices }
+            ?.let { descending[it] }
 
         return GpuInfo(
             currentFrequencyHz = frequency,
             utilizationPercent = busy,
             availableFrequenciesHz = available,
-            source = selectedPath ?: devfreq.firstOrNull { it.name.contains("gpu", true) }?.path
+            source = selectedPath ?: devfreq.firstOrNull { it.name.contains("gpu", true) }?.path,
+            maximumPowerLevel = maximumPowerLevel,
+            minimumPowerLevel = minimumPowerLevel,
+            numberOfPowerLevels = numberOfPowerLevels,
+            maximumClockHz = maximumFrequency,
+            availableFrequenciesMHz = available.map { (it / 1_000_000L).toInt() }.distinct(),
+            minimumClockMHz = minimumFrequency?.let { (it / 1_000_000L).toInt() },
+            maximumClockMHz = maximumFrequency?.let { (it / 1_000_000L).toInt() }
         )
+    }
+
+    private fun discoverRegulators(): List<RegulatorTelemetry> {
+        val directories = discoverDirectories(
+            "/sys/class/regulator",
+            Regex("regulator[0-9]+")
+        )
+        return directories.mapNotNull { directory ->
+            val path = directory.absolutePath
+            val name = read("$path/name")?.takeIf { it.isNotBlank() } ?: directory.name
+            val telemetry = RegulatorTelemetry(
+                name = name,
+                voltageMicrovolts = KernelParsers.longValue(read("$path/microvolts")),
+                minimumMicrovolts = KernelParsers.longValue(read("$path/min_microvolts")),
+                maximumMicrovolts = KernelParsers.longValue(read("$path/max_microvolts")),
+                state = read("$path/state")?.takeIf { it.isNotBlank() }
+            )
+            if (telemetry.voltageMicrovolts == null &&
+                telemetry.minimumMicrovolts == null &&
+                telemetry.maximumMicrovolts == null &&
+                telemetry.state == null) {
+                null
+            } else {
+                telemetry
+            }
+        }.distinctBy { it.name }.sortedBy { it.name }.take(24)
     }
 
     private fun discoverThermalSensors(): List<ThermalSensor> {
