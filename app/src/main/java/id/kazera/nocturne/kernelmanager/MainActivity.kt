@@ -108,26 +108,30 @@ class MainActivity : Activity() {
 
     private fun installWindowInsets(view: HomeScreen) {
         view.setOnApplyWindowInsetsListener { target, insets ->
-            val topInset: Int
-            val bottomInset: Int
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                topInset = insets.getInsets(
-                    WindowInsets.Type.statusBars() or WindowInsets.Type.displayCutout()
-                ).top
-                bottomInset = insets.getInsets(WindowInsets.Type.navigationBars()).bottom
+                val bars = insets.getInsets(
+                    WindowInsets.Type.statusBars() or
+                        WindowInsets.Type.navigationBars() or
+                        WindowInsets.Type.displayCutout()
+                )
+                target.setPadding(
+                    target.paddingLeft,
+                    bars.top,
+                    target.paddingRight,
+                    bars.bottom
+                )
             } else {
                 @Suppress("DEPRECATION")
-                run {
-                    topInset = insets.systemWindowInsetTop
-                    bottomInset = insets.systemWindowInsetBottom
-                }
+                val topInset = insets.systemWindowInsetTop
+                @Suppress("DEPRECATION")
+                val bottomInset = insets.systemWindowInsetBottom
+                target.setPadding(
+                    target.paddingLeft,
+                    topInset,
+                    target.paddingRight,
+                    bottomInset
+                )
             }
-            target.setPadding(
-                target.paddingLeft,
-                topInset,
-                target.paddingRight,
-                bottomInset
-            )
             insets
         }
         view.requestApplyInsets()
