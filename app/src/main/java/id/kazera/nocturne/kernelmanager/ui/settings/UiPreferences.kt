@@ -1,16 +1,19 @@
 package id.kazera.nocturne.kernelmanager.ui.settings
 
 import android.content.Context
+import java.util.Locale
 
 object UiPreferences {
     private const val FILE_NAME = "nocturne_ui_preferences"
     private const val KEY_LANGUAGE = "language"
     private const val KEY_REFRESH_INTERVAL = "refresh_interval_seconds"
 
-    fun language(context: Context): String =
-        context.getSharedPreferences(FILE_NAME, Context.MODE_PRIVATE)
-            .getString(KEY_LANGUAGE, "en")
-            ?.takeIf { it == "en" || it == "id" } ?: "en"
+    fun language(context: Context): String {
+        val saved = context.getSharedPreferences(FILE_NAME, Context.MODE_PRIVATE)
+            .getString(KEY_LANGUAGE, null)
+        if (saved == "en" || saved == "id") return saved
+        return if (Locale.getDefault().language.equals("id", ignoreCase = true)) "id" else "en"
+    }
 
     fun setLanguage(context: Context, language: String) {
         if (language != "en" && language != "id") return
