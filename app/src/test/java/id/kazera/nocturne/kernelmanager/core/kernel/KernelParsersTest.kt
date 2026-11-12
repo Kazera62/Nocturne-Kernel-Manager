@@ -135,6 +135,23 @@ class KernelParsersTest {
     }
 
     @Test
+    fun acceptsOnlyRecognizedGpuDevfreqNames() {
+        assertEquals(true, KernelParsers.isSupportedGpuDevfreqName("kgsl-3d0"))
+        assertEquals(true, KernelParsers.isSupportedGpuDevfreqName("qcom,kgsl-3d0"))
+        assertEquals(true, KernelParsers.isSupportedGpuDevfreqName("GPU"))
+        assertEquals(false, KernelParsers.isSupportedGpuDevfreqName("cpubw-cpufreq"))
+        assertEquals(false, KernelParsers.isSupportedGpuDevfreqName("unknown-device"))
+    }
+
+    @Test
+    fun validatesGovernorTokensBeforeLiveListMembershipCheck() {
+        listOf("performance", "powersave", "simple_ondemand", "msm-adreno-tz")
+            .forEach { assertEquals(true, KernelParsers.isValidDevfreqGovernor(it)) }
+        listOf("", "two words", "bad/name", "bad;value", "../governor", "x".repeat(41))
+            .forEach { assertEquals(false, KernelParsers.isValidDevfreqGovernor(it)) }
+    }
+
+    @Test
     fun keepsAtLeastTwoCoresOnlineWhenDisablingSecondaryCores() {
         assertEquals(true, KernelParsers.canChangeCpuOnline(1, false, 3))
         assertEquals(false, KernelParsers.canChangeCpuOnline(1, false, 2))
