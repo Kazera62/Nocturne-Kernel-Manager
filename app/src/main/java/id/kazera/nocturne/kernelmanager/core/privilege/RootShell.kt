@@ -82,19 +82,19 @@ class RootShell : AutoCloseable {
         return writeNode("/sys/class/kgsl/kgsl-3d0/max_pwrlevel", level.toString())
     }
 
-    fun writeSchedutilTunable(policyPath: String, tunable: String, value: String): ShellResult {
-        val policyAllowed = Regex(
-            "^/sys/devices/system/cpu/(cpufreq/policy[0-9]+|cpu[0-7]/cpufreq)$"
-        ).matches(policyPath)
+    fun writeSchedutilTunable(tunablesPath: String, tunable: String, value: String): ShellResult {
+        val pathAllowed = Regex(
+            "^/sys/devices/system/cpu/(cpufreq/policy[0-9]+/schedutil|cpu[0-7]/cpufreq/schedutil|cpufreq/schedutil)$"
+        ).matches(tunablesPath)
         val tunableAllowed = tunable in setOf(
             "hispeed_load", "hispeed_freq", "up_rate_limit_us", "down_rate_limit_us", "pl"
         )
         val valueAllowed = Regex("^[0-9]{1,10}$").matches(value) &&
             (tunable != "pl" || value in setOf("0", "1"))
-        if (!policyAllowed || !tunableAllowed || !valueAllowed) {
+        if (!pathAllowed || !tunableAllowed || !valueAllowed) {
             return rejected("Rejected schedutil tunable path or value.")
         }
-        return writeNode("$policyPath/schedutil/$tunable", value)
+        return writeNode("$tunablesPath/$tunable", value)
     }
 
     fun writeDynamicFsync(enabled: Boolean): ShellResult =
