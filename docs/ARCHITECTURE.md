@@ -61,7 +61,7 @@ DeviceSnapshot contains a single sample for the UI. Nullable fields represent un
 | --- | --- | --- |
 | CPU topology | /sys/devices/system/cpu/present, cpu*/online | CPU0 protected; IDs 1–7 only; at least two online cores retained; read-back required |
 | CPU cpufreq | /sys/devices/system/cpu/cpufreq/policy*, legacy per-CPU cpufreq | Governor and min/max from live lists only |
-| Schedutil | /sys/devices/system/cpu/{cpufreq/policy*/schedutil,cpu*/cpufreq/schedutil,cpufreq/schedutil}/ | Per-policy or global path discovered from live nodes; bounded values, common OPP validation for global hispeed_freq, read-back and rollback |
+| Schedutil | Per-policy `/sys/devices/system/cpu/cpufreq/policyN/schedutil/` or `cpuN/cpufreq/schedutil/`; global `/sys/devices/system/cpu/cpufreq/schedutil/` | Live node discovery; bounded values, common OPP validation for global hispeed_freq, read-back and rollback |
 | GPU | /sys/class/kgsl/kgsl-3d0/gpu_available_frequencies, max_pwrlevel, min_pwrlevel, num_pwrlevels | Maximum power-level selector using a live OPP only; thermal_pwrlevel is never written |
 | CCI / DDR | Matching /sys/class/devfreq/*/available_frequencies, min_freq, max_freq | Writes only when both bound nodes and selected live OPPs exist; path/name allowlist, ordered writes, read-back and rollback |
 | Regulator | /sys/class/regulator/regulator*/ | Voltage/range/state telemetry only |
