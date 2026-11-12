@@ -1,8 +1,12 @@
 package id.kazera.nocturne.kernelmanager.core.privilege
 
 import java.io.BufferedReader
+import java.io.BufferedWriter
+import java.io.IOException
 import java.io.InputStreamReader
+import java.io.OutputStreamWriter
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicLong
 
 data class ShellResult(
     val success: Boolean,
@@ -18,42 +22,46 @@ data class RootAccess(
 )
 
 /**
- * Minimal SU bridge shared by Magisk, KernelSU-family managers and APatch.
- * The app never accepts arbitrary shell input from the UI.
+ * A cached interactive SU session prevents a new su process from being started
+ * for every sysfs/procfs read. Calls are serialized and bounded by a timeout.
+ *
+ * All writable interfaces are exposed through narrow allow-listed methods.
+ * The UI never receives an arbitrary shell command field.
  */
-class RootShell {
+class RootShell : AutoCloseable {
+
+    private val lock = Any()
+    private val commandCounter = AtomicLong(0L)
+
+    private var process: Process? = null
+    private var input: BufferedReader? = null
+    private var output: BufferedWriter? = null
 
     fun detect(): RootAccess {
-        val result = execute("id", timeoutMs = 4_000)
-        if (!result.success || !result.output.contains("uid=0")) {
-            return RootAccess(
+        val result = execute("id", timeoutMs = 3_000)
+        val granted = result.success &&
+            Regex("(^|\\s)uid=0(?:\\(|\\s|$)").containsMatchIn(result.output)
+
+        return if (granted) {
+            RootAccess(
+                available = true,
+                provider = "SU-compatible root",
+                detail = "Root session is ready and cached."
+            )
+        } else {
+            RootAccess(
                 available = false,
                 provider = "No root access",
-                detail = result.error ?: result.output.ifBlank { "SU authorization unavailable" }
+                detail = result.error ?: result.output.ifBlank {
+                    "SU authorization was denied or timed out."
+                }
             )
         }
-
-        val version = execute("su -v", timeoutMs = 2_000).output
-            .ifBlank { execute("su -V", timeoutMs = 2_000).output }
-            .trim()
-        val provider = when {
-            version.contains("magisk", ignoreCase = true) -> "Magisk"
-            version.contains("apatch", ignoreCase = true) -> "APatch"
-            version.contains("kernelsu", ignoreCase = true) -> "KernelSU-compatible"
-            version.isNotBlank() -> version.take(42)
-            else -> "SU-compatible root provider"
-        }
-
-        return RootAccess(
-            available = true,
-            provider = provider,
-            detail = "Root shell verified (uid=0)"
-        )
     }
 
     fun read(path: String): String? {
         if (!isAllowedReadPath(path)) return null
-        val result = execute("cat " + quote(path), timeoutMs = 2_500)
+        val result = execute("cat " + quote(path), timeoutMs = 2_000)
         return result.output.takeIf { result.success }?.trim()
     }
 
@@ -62,7 +70,7 @@ class RootShell {
             "^/sys/devices/system/cpu/(cpufreq/policy[0-9]+|cpu[0-7]/cpufreq)/scaling_(min_freq|max_freq|governor)$"
         ).matches(path)
         if (!allowedPath || !Regex("^[A-Za-z0-9_.-]{1,40}$").matches(value)) {
-            return ShellResult(false, "", -1, "Rejected invalid CPU control target or value")
+            return rejected("Rejected invalid CPU control target or value.")
         }
         return writeNode(path, value)
     }
@@ -72,13 +80,9 @@ class RootShell {
             "^/sys/block/[A-Za-z0-9_.-]+/queue/scheduler$"
         ).matches(path)
         if (!allowedPath || !Regex("^[A-Za-z0-9_.-]{1,40}$").matches(value)) {
-            return ShellResult(false, "", -1, "Rejected invalid I/O scheduler target or value")
+            return rejected("Rejected invalid I/O scheduler target or value.")
         }
         return writeNode(path, value)
-    }
-
-    fun kernelLogs(): ShellResult {
-        return execute("dmesg | tail -n 160", timeoutMs = 5_000)
     }
 
     fun writeVmSetting(setting: String, value: Int): ShellResult {
@@ -86,73 +90,161 @@ class RootShell {
             "swappiness" -> if (value in 0..100) "/proc/sys/vm/swappiness" else null
             "vfs_cache_pressure" -> if (value in 10..200) "/proc/sys/vm/vfs_cache_pressure" else null
             else -> null
-        } ?: return ShellResult(false, "", -1, "Rejected unsupported VM setting or value")
+        } ?: return rejected("Rejected unsupported VM setting or value.")
         return writeNode(target, value.toString())
     }
 
     fun writeTcpCongestionControl(value: String): ShellResult {
         if (!Regex("^[A-Za-z0-9_-]{1,32}$").matches(value)) {
-            return ShellResult(false, "", -1, "Rejected invalid TCP congestion control value")
+            return rejected("Rejected invalid TCP congestion control value.")
         }
         return writeNode("/proc/sys/net/ipv4/tcp_congestion_control", value)
     }
 
+    fun kernelLogs(): ShellResult =
+        execute("dmesg | tail -n 160", timeoutMs = 5_000)
+
     private fun writeNode(path: String, value: String): ShellResult {
-        // Both path and value are restricted by strict allow-lists above.
+        // Both target and value are validated by the public write adapters.
         return execute("printf '%s\\n' '$value' > '$path'", timeoutMs = 3_000)
     }
 
     fun execute(command: String, timeoutMs: Long = 4_000): ShellResult {
-        val process = try {
-            ProcessBuilder("su", "-c", command)
+        if (command.isBlank() || command.contains('\u0000')) {
+            return rejected("Empty or invalid shell command.")
+        }
+
+        synchronized(lock) {
+            val session = ensureSession()
+                ?: return ShellResult(false, "", -1, "Unable to start SU session.")
+
+            val marker = "__NOCTURNE_" + commandCounter.incrementAndGet() + "__"
+            return try {
+                session.second.write(command)
+                session.second.newLine()
+                session.second.write(
+                    "__nocturne_status=\\$?; printf '\\n\${marker}:%s\\n' \"\\$__nocturne_status\""
+                )
+                session.second.newLine()
+                session.second.flush()
+
+                var result: ShellResult? = null
+                var readFailure: String? = null
+                val readerThread = Thread {
+                    try {
+                        val captured = StringBuilder()
+                        while (true) {
+                            val line = session.first.readLine()
+                                ?: throw IOException("SU session closed unexpectedly.")
+                            if (line.startsWith(marker + ":")) {
+                                val code = line.substringAfter(':').trim().toIntOrNull() ?: 1
+                                result = ShellResult(
+                                    success = code == 0,
+                                    output = captured.toString().trim(),
+                                    exitCode = code,
+                                    error = if (code == 0) null else captured.toString().trim()
+                                        .ifBlank { "Root command failed ($code)." }
+                                )
+                                break
+                            }
+                            captured.append(line).append('\n')
+                        }
+                    } catch (error: Exception) {
+                        readFailure = error.message ?: "Unable to read SU output."
+                    }
+                }.apply {
+                    name = "Nocturne-SU-reader"
+                    isDaemon = true
+                    start()
+                }
+
+                readerThread.join(timeoutMs)
+                if (readerThread.isAlive) {
+                    clearSession(destroy = true)
+                    return ShellResult(false, "", -1, "Root command timed out.")
+                }
+
+                result ?: run {
+                    val error = readFailure ?: "No result returned by SU."
+                    clearSession(destroy = true)
+                    ShellResult(false, "", -1, error)
+                }
+            } catch (error: Exception) {
+                clearSession(destroy = true)
+                ShellResult(false, "", -1, error.message ?: "SU command failed.")
+            }
+        }
+    }
+
+    private fun ensureSession(): Pair<BufferedReader, BufferedWriter>? {
+        val active = process
+        val reader = input
+        val writer = output
+        if (active != null && active.isAlive && reader != null && writer != null) {
+            return reader to writer
+        }
+
+        clearSession(destroy = true)
+        return try {
+            val started = ProcessBuilder("su")
                 .redirectErrorStream(true)
                 .start()
-        } catch (error: Exception) {
-            return ShellResult(false, "", -1, error.message ?: "Unable to start su")
+            process = started
+            input = BufferedReader(InputStreamReader(started.inputStream))
+            output = BufferedWriter(OutputStreamWriter(started.outputStream))
+            Pair(input!!, output!!)
+        } catch (_: Exception) {
+            clearSession(destroy = true)
+            null
         }
+    }
 
-        var output = ""
-        val reader = Thread {
-            output = try {
-                BufferedReader(InputStreamReader(process.inputStream)).use { it.readText() }
+    private fun clearSession(destroy: Boolean) {
+        try {
+            output?.close()
+        } catch (_: Exception) {
+            // Session is already closed.
+        }
+        try {
+            input?.close()
+        } catch (_: Exception) {
+            // Session is already closed.
+        }
+        if (destroy) {
+            try {
+                process?.destroyForcibly()
+                process?.waitFor(250, TimeUnit.MILLISECONDS)
             } catch (_: Exception) {
-                ""
+                // The process may already have exited.
             }
-        }.apply {
-            name = "Nocturne-SU-output"
-            isDaemon = true
-            start()
         }
+        process = null
+        input = null
+        output = null
+    }
 
-        val finished = try {
-            process.waitFor(timeoutMs, TimeUnit.MILLISECONDS)
-        } catch (error: InterruptedException) {
-            Thread.currentThread().interrupt()
-            false
+    fun invalidate() {
+        synchronized(lock) {
+            clearSession(destroy = true)
         }
+    }
 
-        if (!finished) {
-            process.destroyForcibly()
-            reader.join(300)
-            return ShellResult(false, output.trim(), -1, "Root command timed out")
+    override fun close() {
+        synchronized(lock) {
+            clearSession(destroy = true)
         }
-
-        reader.join(1_000)
-        val code = process.exitValue()
-        return ShellResult(
-            success = code == 0,
-            output = output.trim(),
-            exitCode = code,
-            error = if (code == 0) null else output.trim().ifBlank { "Command failed ($code)" }
-        )
     }
 
     private fun isAllowedReadPath(path: String): Boolean {
         if (path.contains("..") || path.contains('\u0000')) return false
-        return path.startsWith("/sys/") || path.startsWith("/proc/") ||
+        return path.startsWith("/sys/") ||
+            path.startsWith("/proc/") ||
             path.startsWith("/vendor/")
     }
 
     private fun quote(value: String): String =
         "'" + value.replace("'", "'\\''") + "'"
+
+    private fun rejected(message: String): ShellResult =
+        ShellResult(false, "", -1, message)
 }
