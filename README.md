@@ -54,7 +54,7 @@ The bridge targets root managers that provide a standard SU interface, including
 | Controller | Validation |
 | --- | --- |
 | CPU governor and min/max frequency | Live governor and OPP lists, path allow-list, read-back and best-effort rollback |
-| I/O scheduler | Re-read the selected block device's available scheduler list before writing |
+| I/O scheduler | Physical-device whitelist, live scheduler re-read, exact path check and read-back |
 | VM swappiness | 0–100 |
 | VFS cache pressure | 10–200 |
 | TCP congestion control | Selected algorithm must be present in the kernel's live available list |
