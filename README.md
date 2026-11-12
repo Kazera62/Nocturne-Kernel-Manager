@@ -1,101 +1,88 @@
 # Nocturne Kernel Manager
 
-Nocturne Kernel Manager adalah aplikasi Android untuk membantu memantau perangkat dan mengelola interface kernel pada keluarga **Samsung Galaxy M11 (SM-M115)** dan **Samsung Galaxy A11 (SM-A115)** berbasis **Qualcomm Snapdragon 450 / SDM450**.
+Aplikasi Android untuk memantau dan mengelola interface kernel pada Samsung Galaxy M11 (SM-M115) dan Galaxy A11 (SM-A115), berbasis Qualcomm Snapdragon 450 / SDM450.
 
-Aplikasi menggunakan pendekatan capability-driven: setiap nilai dan kontrol berasal dari interface yang benar-benar terdeteksi pada perangkat. Node yang tidak tersedia akan ditampilkan sebagai **Unsupported**. Aplikasi tidak membuat nilai contoh dan tidak menganggap semua varian firmware atau kernel memiliki layout sysfs yang sama.
+## Release status
 
-## Status
+**Version: 0.3.0 · Core UI and kernel integration**
 
-**Tahap: core application implementation.**
+Aplikasi memakai model *capability-driven*: interface dicari pada perangkat yang sedang berjalan. Kontrol hanya ditampilkan saat node dan nilai yang dibutuhkan tersedia. Node yang tidak tersedia ditandai **Unsupported**, bukan diisi data contoh.
 
-Aplikasi saat ini menyediakan dashboard pemantauan, pembacaan interface kernel, root bridge berbasis perintah standard su, kontrol CPU cpufreq, I/O scheduler, VM sysctl, TCP congestion control, dan tampilan log kernel.
+Target M11/A11 adalah fokus pengembangan. Seluruh varian regional, firmware, ROM dan kernel belum diklaim telah diuji secara fisik.
 
-## Target perangkat
+## What is implemented
 
-| Perangkat | Keluarga model | Target platform |
-| --- | --- | --- |
-| Samsung Galaxy M11 | SM-M115 series | Qualcomm Snapdragon 450 |
-| Samsung Galaxy A11 | SM-A115 series | Qualcomm Snapdragon 450 |
-
-Target perangkat adalah fokus pengembangan, bukan klaim bahwa semua SKU regional, firmware, ROM, atau kernel telah diuji secara fisik.
-
-## Implementasi saat ini
-
-| Area | Kemampuan |
+| Area | Function |
 | --- | --- |
-| Device | Model, device code, platform, kernel release, uptime |
-| Root | SU-compatible root check dan command bridge |
-| CPU | Per-policy current/min/max frequency, available OPP, governor; apply governor dan frequency limits |
-| GPU | KGSL/devfreq clock, utilization, available OPP bila diekspos; read-only |
-| CCI / DDR | Devfreq current frequency, governor, available frequency entries; read-only |
-| Memory | MemTotal, MemAvailable, ZRAM, swappiness, VFS cache pressure |
-| Thermal | Semua thermal zone yang terbaca; read-only |
-| I/O | Disk counters dan per-device scheduler; apply scheduler yang tersedia |
-| Battery | Level, charging state, temperature, voltage, technology |
-| Storage | Data partition total dan available |
-| Network | Android TrafficStats RX/TX counters; TCP congestion selector dari daftar kernel |
-| Diagnostics | Tampilan 160 baris terakhir dmesg; root diperlukan |
+| Root | Startup root preflight, persistent SU session, status chip, manual re-check |
+| CPU | Per-policy governor, OPP table, current/min/max frequency |
+| CPU topology | Present/online core monitoring |
+| GPU | Adreno/KGSL frequency and utilization telemetry |
+| CCI / DDR | Devfreq telemetry for interconnect and memory bus |
+| Memory | RAM, ZRAM statistics, swappiness, VFS cache pressure |
+| Kernel extras | ZRAM compression algorithm, KSM status/statistics, entropy readings |
+| Thermal | Detected thermal-zone temperatures |
+| I/O | Disk statistics and per-device scheduler |
+| Network | RX/TX counters and kernel-supported TCP congestion algorithms |
+| System | Battery, storage, uptime, kernel release and dmesg |
+| Settings | English / Bahasa Indonesia and configurable refresh interval |
 
-### CPU controls
+## Application layout
 
-- Menemukan cpufreq policy secara dinamis.
-- Membaca governor dan frekuensi yang diekspos kernel.
-- Pilihan frekuensi dibatasi pada daftar OPP yang dibaca dari perangkat.
-- Validasi min <= max dan nilai harus menjadi anggota OPP table.
-- Perubahan dilakukan melalui su dan berusaha mengembalikan nilai sebelumnya jika write gagal.
-- Perubahan runtime tidak dijamin bertahan setelah reboot.
+The navigation is divided into four main areas:
 
-### I/O controls
+- **Overview** — device identity, root status and live summary.
+- **Performance** — CPU policy, CPU core topology, VM parameters and I/O scheduler.
+- **Monitor** — GPU/KGSL, CCI/DDR devfreq and thermal sensors.
+- **System** — battery, storage, network, TCP congestion and kernel logs.
 
-- Menemukan /sys/block/*/queue/scheduler.
-- Menampilkan scheduler aktif dan daftar scheduler yang benar-benar didukung node.
-- Hanya nilai yang terdaftar yang dapat diterapkan.
+The gear icon in the top-right opens **Settings**. Language and refresh preferences are stored locally.
 
-### VM controls
+## Root startup flow
 
-- Swappiness dibatasi ke 0–100.
-- VFS cache pressure dibatasi ke 10–200.
-- Nilai lama dibaca terlebih dahulu; jika perubahan kedua gagal, aplikasi mencoba mengembalikan nilai sebelumnya.
-- Perubahan berlaku untuk sesi boot saat ini dan tidak dipersistenkan.
+1. The app starts a root preflight before scanning the broader kernel interface set.
+2. The root status is rendered as soon as the preflight finishes.
+3. The app keeps one interactive SU session and reuses it for subsequent reads and writes.
+4. A manual refresh invalidates the session, re-checks authorization and then reloads device telemetry.
 
-### Network controls
+The bridge targets root managers that provide a standard SU interface, including Magisk, KernelSU-family managers, BakaSU and APatch. Actual behavior must still be checked with the installed manager and ROM.
 
-- Membaca algoritma aktif dan daftar tcp_available_congestion_control.
-- Hanya algoritma yang disediakan kernel yang dapat diterapkan.
-- TrafficStats RX/TX tetap berupa counter Android read-only.
+## Available controls
 
-## Root compatibility
+| Controller | Validation |
+| --- | --- |
+| CPU governor and min/max frequency | Live governor and OPP lists, path allow-list, read-back and best-effort rollback |
+| I/O scheduler | Re-read the selected block device's available scheduler list before writing |
+| VM swappiness | 0–100 |
+| VFS cache pressure | 10–200 |
+| TCP congestion control | Selected algorithm must be present in the kernel's live available list |
 
-Root bridge menggunakan antarmuka standard su -c. Desain ini ditujukan agar dapat dipakai dengan root manager yang menyediakan command interface tersebut, seperti Magisk, KernelSU, KernelSU Next, BakaSU, dan APatch. Nama provider yang dilaporkan bergantung pada output versi su; deteksi provider tidak dijadikan syarat untuk menjalankan command.
+These are runtime controls. The app does not guarantee that settings persist across reboot.
 
-Kompatibilitas aktual tetap harus diverifikasi pada manager, versi, ROM, dan perangkat yang digunakan. Aplikasi tidak menginstal atau mengganti root manager.
+## SmartPack-inspired ideas
 
-## Layout aplikasi
+The archived [SmartPack Kernel Manager](https://github.com/SmartPack/SmartPack-Kernel-Manager) was reviewed for feature organization and capability discovery. No SmartPack source file was copied into this project.
 
-- **Overview** — ringkasan perangkat, root, CPU, GPU, RAM, dan thermal.
-- **CPU** — governor dan frequency limits per policy.
-- **GPU** — telemetry KGSL/devfreq.
-- **CCI / DDR** — telemetry devfreq untuk interconnect dan memory bus.
-- **Memory** — RAM, ZRAM, swappiness, dan VFS cache pressure.
-- **Thermal** — seluruh sensor yang terdeteksi.
-- **I/O** — disk counters dan scheduler.
-- **System** — battery, storage, network, TCP congestion control, kernel information, dan dmesg.
+The current implementation independently includes read-only views for:
+- CPU core online topology;
+- ZRAM compression algorithm and supported algorithms;
+- KSM status and shared-page counters;
+- entropy pool readings.
 
-UI menggunakan komponen Android native dan tema gelap, tanpa dependency UI eksternal.
+SmartPack Kernel Manager is archived and marked GPL-3.0. This project uses the repository as a feature reference, not as copied implementation code.
 
 ## Safety boundaries
 
-Aplikasi **tidak** menyediakan:
-- GPU overclock atau GPU maximum-clock cap;
-- voltage override;
-- regulator, CPR, atau corner scaling changes;
-- DDR/RAM overclock;
-- thermal trip-point edits atau thermal protection disable;
-- arbitrary shell command input dari UI.
+The application does not expose:
+- GPU overclocking or GPU maximum-frequency caps;
+- voltage overrides or regulator writes;
+- CPR/corner scaling changes;
+- DDR/RAM overclocking;
+- thermal trip-point changes or thermal-protection bypass;
+- CPU hotplug writes in this release;
+- arbitrary shell commands from the UI.
 
-GPU OPP dan batas GPU yang didefinisikan kernel dibiarkan apa adanya. Thermal protection tetap dikendalikan kernel dan Android thermal framework. Zygote-triggered DDR bandwidth boost, jika ada pada kernel yang terpasang, tetap menjadi tanggung jawab implementasi kernel dan tidak dibuat ulang oleh polling aplikasi.
-
-Semua interface yang tidak dikenal atau tidak tervalidasi harus tetap read-only / Unsupported.
+GPU, CCI/DDR, KSM, ZRAM algorithm and entropy are monitoring-only. Kernel-side Zygote DDR bandwidth boost, when provided by the running kernel, remains kernel-owned and is not recreated by app polling.
 
 ## Build
 
@@ -105,40 +92,33 @@ Requirements:
 - Android SDK Build Tools 36.0.0
 - Gradle Wrapper 9.6.0
 
-Build debug APK:
+Run:
 
-```bash
-./gradlew assembleDebug
-```
-
-Run checks:
-
-```bash
+~~~bash
 ./gradlew testDebugUnitTest lintDebug assembleDebug
-```
+~~~
 
-Output:
-```text
+Debug APK output:
+
+~~~text
 app/build/outputs/apk/debug/app-debug.apk
-```
+~~~
 
 ## GitHub Actions
 
-Workflow **Android CI** hanya dijalankan manual:
-1. Buka tab **Actions**.
-2. Pilih **Android CI**.
-3. Tekan **Run workflow**.
-4. Pilih branch main.
+The **Android CI** workflow is manually triggered and restricted to main:
 
-Workflow menjalankan unit tests, Android lint, dan debug APK build. APK yang berhasil dibuat disimpan sebagai artifact selama 14 hari. Push dan pull request tidak menjalankan CI secara otomatis.
+1. Open **Actions**.
+2. Select **Android CI**.
+3. Select **Run workflow** on main.
 
-## Repository documentation
+It runs unit tests, lint and assembleDebug, then uploads the debug APK artifact for 14 days.
 
-- Architecture — docs/ARCHITECTURE.md
-- Contributing — CONTRIBUTING.md
-- Changelog — CHANGELOG.md
-- Security — SECURITY.md
+## Documentation
 
-## License
+- [Architecture](docs/ARCHITECTURE.md)
+- [Contributing](CONTRIBUTING.md)
+- [Changelog](CHANGELOG.md)
+- [Security policy](SECURITY.md)
 
-Lisensi repository belum ditetapkan. Sampai lisensi resmi ditambahkan, source code mengikuti ketentuan hak cipta default.
+The project license has not yet been selected. Until a license is added, repository contents remain under their default copyright terms.
