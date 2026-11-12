@@ -18,7 +18,7 @@ Target M11/A11 adalah fokus pengembangan. Seluruh varian regional, firmware, ROM
 | CPU | Per-policy governor, OPP table, current/min/max frequency; optional schedutil tunables when exposed |
 | CPU topology | Present/online monitoring; CPU0 protected and optional hotplug for secondary cores 1–7 |
 | GPU | Adreno/KGSL telemetry and maximum power-level selection from the live OPP table (Advanced menu) |
-| CPU tuning | Live schedutil hispeed load/frequency and rate-limit tunables when exposed |
+| CPU tuning | Live schedutil hispeed load/frequency, up/down rate limits and optional WALT PL utilization toggle when exposed |
 | Storage policy | Optional Dynamic Fsync runtime toggle when its kernel node exists |
 | CCI / DDR | Devfreq min/max tuning only when writable nodes and matching live OPPs are exposed; otherwise read-only |
 | Memory | RAM, ZRAM statistics, swappiness, VFS cache pressure |
