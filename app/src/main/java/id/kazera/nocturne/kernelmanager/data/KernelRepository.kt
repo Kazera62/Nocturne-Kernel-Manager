@@ -278,11 +278,18 @@ class KernelRepository(
         return rootShell.kernelLogs()
     }
 
+    fun checkRoot(): RootAccess = rootAccess()
+
     fun invalidateRootCache() {
         synchronized(this) {
+            rootShell.invalidate()
             cachedRoot = null
             rootCheckedAt = 0L
         }
+    }
+
+    fun closeRootSession() {
+        rootShell.close()
     }
 
     private fun rootAccess(): RootAccess {
