@@ -48,6 +48,10 @@ class HomeScreen(
     private var snapshot: DeviceSnapshot? = null
     private var rootStatus: RootAccess? = null
     private var currentScroll: ScrollView? = null
+    private val liveBindings = mutableListOf<(DeviceSnapshot) -> Unit>()
+    private var renderedStructureKey: String? = null
+    private var pendingUiSnapshot: DeviceSnapshot? = null
+    private var frameUpdatePending = false
 
     private fun t(value: String): String = UiText.translate(context, value)
 
@@ -64,13 +68,50 @@ class HomeScreen(
 
     fun update(value: DeviceSnapshot, forceRender: Boolean = false) {
         snapshot = value
-        if (forceRender || selectedPage == Page.OVERVIEW || selectedPage == Page.MONITOR) {
+        if (forceRender) {
             render(restoreScroll = true)
+            return
         }
+        if (selectedPage != Page.OVERVIEW && selectedPage != Page.MONITOR) return
+
+        if (renderedStructureKey != structureKey(value)) {
+            render(restoreScroll = true)
+            return
+        }
+
+        // Coalesce telemetry changes and apply them on the next display frame.
+        pendingUiSnapshot = value
+        if (!frameUpdatePending) {
+            frameUpdatePending = true
+            postOnAnimation {
+                frameUpdatePending = false
+                val latest = pendingUiSnapshot
+                pendingUiSnapshot = null
+                if (latest != null) liveBindings.forEach { it(latest) }
+            }
+        }
+    }
+
+    private fun structureKey(data: DeviceSnapshot): String = buildString {
+        append(data.cpuCores.map { it.coreId })
+        append('|')
+        append(data.cpuPolicies.map { it.path })
+        append('|')
+        append(data.devfreq.map { it.path })
+        append('|')
+        append(data.thermalSensors.map { it.name })
+        append('|')
+        append(data.gpu.availableFrequenciesHz)
+        append('|')
+        append(data.gpu.source.orEmpty())
+        append('|')
+        append(data.warnings.sorted())
     }
 
     private fun render(restoreScroll: Boolean = false) {
         val previousScroll = if (restoreScroll) currentScroll?.scrollY ?: 0 else 0
+        liveBindings.clear()
+        pendingUiSnapshot = null
         removeAllViews()
 
         addView(buildHeader(), LayoutParams(MATCH_PARENT, WRAP_CONTENT))
@@ -119,6 +160,7 @@ class HomeScreen(
         }
 
         if (previousScroll > 0) scroll.post { scroll.scrollTo(0, previousScroll) }
+        renderedStructureKey = snapshot?.let(::structureKey)
     }
 
     private fun buildHeader(): View {
@@ -219,14 +261,14 @@ class HomeScreen(
         }
 
     private fun renderOverview(container: LinearLayout, data: DeviceSnapshot) {
-        addPageHeading(container, "Device overview", "Live readings from interfaces available on this device.")
+        addPageHeading(container, "Device overview", "Hardware and kernel status.")
 
         addCard(container, "DEVICE", "Hardware identity") {
             addInfoRow(it, "Model", data.model)
             addInfoRow(it, "Device code", data.deviceCode)
             addInfoRow(it, "Platform", data.platform)
             addInfoRow(it, "Kernel", data.kernelVersion)
-            addInfoRow(it, "Uptime", DeviceInfo.uptime(data.uptimeSeconds))
+            addLiveInfoRow(it, "Uptime", DeviceInfo.uptime(data.uptimeSeconds)) { DeviceInfo.uptime(it.uptimeSeconds) }
         }
 
         val root = rootStatus ?: data.root
@@ -234,44 +276,60 @@ class HomeScreen(
             addText(it, if (root.available) "Privileged shell verified" else "Root permission not available",
                 if (root.available) ACCENT else WARNING, 15f, bold = true)
             addText(it, root.detail, SECONDARY, 12f, top = 5)
-            addText(it, "Uses the standard su command interface. Manager-specific APIs are not required for basic commands.",
+            addText(it, "Standard su interface; no manager-specific API required.",
                 MUTED, 11f, top = 9)
         }
 
-        addCard(container, "PROCESSOR", "Detected CPU frequency policies") {
+        addCard(container, "PROCESSOR", "Frequency policies") {
             val onlineCores = data.cpuCores.count { it.online == true }
-            addInfoRow(it, "Cores online", onlineCores.toString() + "/" + data.cpuCores.size)
+            addLiveInfoRow(it, "Cores online", onlineCores.toString() + "/" + data.cpuCores.size) { current ->
+                current.cpuCores.count { core -> core.online == true }.toString() + "/" + current.cpuCores.size
+            }
             if (data.cpuPolicies.isEmpty()) {
                 addUnsupported(it, "CPU cpufreq policies")
             } else {
                 data.cpuPolicies.forEach { policy ->
-                    addInfoRow(it, policy.name + " · current", DeviceInfo.frequency(policy.currentFrequencyKHz))
-                    addInfoRow(it, "Governor", policy.governor ?: "Unsupported")
+                    addLiveInfoRow(it, policy.name + " · current", DeviceInfo.frequency(policy.currentFrequencyKHz)) { current ->
+                        DeviceInfo.frequency(current.cpuPolicies.firstOrNull { item -> item.path == policy.path }?.currentFrequencyKHz)
+                    }
+                    addLiveInfoRow(it, "Governor", policy.governor ?: "Unsupported") { current ->
+                        current.cpuPolicies.firstOrNull { item -> item.path == policy.path }?.governor ?: "Unsupported"
+                    }
                 }
             }
-            addText(it, "Open CPU for available governor and frequency controls.", MUTED, 11f, top = 8)
+            addText(it, "Set CPU governor and frequency on Performance.", MUTED, 11f, top = 8)
         }
 
         addCard(container, "GRAPHICS", "Adreno / KGSL telemetry") {
-            addInfoRow(it, "GPU clock", DeviceInfo.frequencyHz(data.gpu.currentFrequencyHz))
-            addInfoRow(it, "GPU utilization", data.gpu.utilizationPercent?.let { value -> "$value%" } ?: "Unsupported")
-            addText(it, "GPU overclock and voltage controls are intentionally not provided.", MUTED, 11f, top = 7)
+            addLiveInfoRow(it, "GPU clock", DeviceInfo.frequencyHz(data.gpu.currentFrequencyHz)) { DeviceInfo.frequencyHz(it.gpu.currentFrequencyHz) }
+            addLiveInfoRow(it, "GPU utilization", data.gpu.utilizationPercent?.let { value -> "$value%" } ?: "Unsupported") { current ->
+                current.gpu.utilizationPercent?.let { value -> "$value%" } ?: "Unsupported"
+            }
+            addText(it, "GPU tuning is read-only.", MUTED, 11f, top = 7)
         }
 
         addCard(container, "MEMORY", "RAM and compressed swap") {
             val used = DeviceInfo.memoryUsedPercent(data)
-            addInfoRow(it, "RAM usage", used?.let { value -> "$value%" } ?: "Unsupported")
-            addInfoRow(it, "RAM total", data.memory.totalKb?.let { value -> formatKb(value) } ?: "Unsupported")
-            addInfoRow(it, "ZRAM size", DeviceInfo.bytes(data.memory.zramDiskBytes))
+            addLiveInfoRow(it, "RAM usage", used?.let { value -> "$value%" } ?: "Unsupported") { current ->
+                DeviceInfo.memoryUsedPercent(current)?.let { value -> "$value%" } ?: "Unsupported"
+            }
+            addLiveInfoRow(it, "RAM total", data.memory.totalKb?.let { value -> formatKb(value) } ?: "Unsupported") { current ->
+                current.memory.totalKb?.let { value -> formatKb(value) } ?: "Unsupported"
+            }
+            addLiveInfoRow(it, "ZRAM size", DeviceInfo.bytes(data.memory.zramDiskBytes)) { DeviceInfo.bytes(it.memory.zramDiskBytes) }
         }
 
         addCard(container, "THERMAL", "Sensor summary") {
             val hottest = data.thermalSensors.maxByOrNull { it.temperatureCelsius }
-            addInfoRow(it, "Sensors detected", data.thermalSensors.size.toString())
-            addInfoRow(it, "Highest temperature", hottest?.let { sensor ->
+            addLiveInfoRow(it, "Sensors detected", data.thermalSensors.size.toString()) { it.thermalSensors.size.toString() }
+            addLiveInfoRow(it, "Highest temperature", hottest?.let { sensor ->
                 String.format(Locale.US, "%.1f °C · %s", sensor.temperatureCelsius, sensor.name)
-            } ?: "Unsupported")
-            addText(it, "Thermal protection remains under kernel control.", MUTED, 11f, top = 7)
+            } ?: "Unsupported") { current ->
+                current.thermalSensors.maxByOrNull { sensor -> sensor.temperatureCelsius }?.let { sensor ->
+                    String.format(Locale.US, "%.1f °C · %s", sensor.temperatureCelsius, sensor.name)
+                } ?: "Unsupported"
+            }
+            addText(it, "Thermal limits are kernel-managed.", MUTED, 11f, top = 7)
         }
 
         if (data.warnings.isNotEmpty()) {
@@ -282,25 +340,25 @@ class HomeScreen(
     }
 
     private fun renderPerformance(container: LinearLayout, data: DeviceSnapshot) {
-        addPageHeading(container, "Performance", "CPU, virtual memory and storage scheduler controls.")
+        addPageHeading(container, "Performance", "CPU, VM and I/O controls.")
         renderCpu(container, data)
         renderMemory(container, data)
         renderIo(container, data)
     }
 
     private fun renderMonitor(container: LinearLayout, data: DeviceSnapshot) {
-        addPageHeading(container, "Monitor", "Live hardware telemetry. Unsupported nodes are not simulated.")
+        addPageHeading(container, "Monitor", "Live hardware telemetry.")
         renderGpu(container, data)
         renderFabric(container, data)
         renderThermal(container, data)
     }
 
     private fun renderSettings(container: LinearLayout, data: DeviceSnapshot?) {
-        addPageHeading(container, "Settings", "Application preferences and root diagnostics.")
+        addPageHeading(container, "Settings", "App settings and root status.")
 
         addCard(container, "Application preferences") { card ->
             addText(card, "Language", SECONDARY, 13f, bold = true)
-            addText(card, "Choose the language used throughout the application.", MUTED, 11f, top = 4, bottom = 10)
+            addText(card, "App language.", MUTED, 11f, top = 4, bottom = 10)
             val languageRow = LinearLayout(context).apply {
                 orientation = HORIZONTAL
                 gravity = Gravity.CENTER_VERTICAL
@@ -324,7 +382,7 @@ class HomeScreen(
         }
 
         addCard(container, "Refresh interval") { card ->
-            addText(card, "Choose how often live kernel telemetry is refreshed.", MUTED, 11f, bottom = 8)
+            addText(card, "Telemetry refresh rate.", MUTED, 11f, bottom = 8)
             val currentInterval = UiPreferences.refreshIntervalSeconds(context)
             val options = listOf("5 seconds", "8 seconds", "15 seconds", "30 seconds")
             val picker = spinner(options, "$currentInterval seconds")
@@ -350,7 +408,7 @@ class HomeScreen(
                 null -> "Unknown"
             })
             addInfoRow(card, "Provider", root?.provider ?: "Unknown")
-            addText(card, "Root access is checked before kernel telemetry is scanned. A cached SU session is reused for subsequent reads.",
+            addText(card, "Root is checked at startup; the SU session is reused.",
                 MUTED, 11f, top = 8)
             cardButton(card, "Check root now") {
                 onRootRefresh()
@@ -481,22 +539,24 @@ class HomeScreen(
     }
 
     private fun renderGpu(container: LinearLayout, data: DeviceSnapshot) {
-        addPageHeading(container, "GPU telemetry", "Read-only Adreno / KGSL and devfreq readings.")
+        addPageHeading(container, "GPU telemetry", "GPU and devfreq telemetry (read-only).")
         addCard(container, "GPU STATUS", data.gpu.source ?: "No KGSL / GPU node detected") {
-            addInfoRow(it, "Current frequency", DeviceInfo.frequencyHz(data.gpu.currentFrequencyHz))
-            addInfoRow(it, "Utilization", data.gpu.utilizationPercent?.let { value -> "$value%" } ?: "Unsupported")
+            addLiveInfoRow(it, "Current frequency", DeviceInfo.frequencyHz(data.gpu.currentFrequencyHz)) { DeviceInfo.frequencyHz(it.gpu.currentFrequencyHz) }
+            addLiveInfoRow(it, "Utilization", data.gpu.utilizationPercent?.let { value -> "$value%" } ?: "Unsupported") { current ->
+                current.gpu.utilizationPercent?.let { value -> "$value%" } ?: "Unsupported"
+            }
             addInfoRow(it, "Available OPP entries", data.gpu.availableFrequenciesHz.size.toString())
         }
         addCard(container, "GPU SAFETY POLICY") {
-            addText(it, "This application does not expose GPU overclocking, maximum-clock caps, voltage overrides, regulator changes, or CPR/corner scaling. Existing kernel GPU operating points are left unchanged.",
+            addText(it, "GPU OPPs, voltage, regulator and corner-scaling controls are not modified.",
                 SECONDARY, 13f)
-            addText(it, "Telemetry is shown only when the device exposes a readable KGSL or devfreq node.",
+            addText(it, "Requires a readable KGSL or devfreq node.",
                 MUTED, 11f, top = 9)
         }
     }
 
     private fun renderFabric(container: LinearLayout, data: DeviceSnapshot) {
-        addPageHeading(container, "CCI & DDR fabric", "Current devfreq values from detected interconnect and memory-bus nodes.")
+        addPageHeading(container, "CCI & DDR fabric", "CCI and DDR devfreq readings.")
         if (data.devfreq.isEmpty()) {
             addCard(container, "Fabric telemetry unavailable") {
                 addUnsupported(it, "No matching CCI, cpubw, bus, DDR, memory or LLCC devfreq node was detected.")
@@ -504,20 +564,24 @@ class HomeScreen(
         } else {
             data.devfreq.forEach { item ->
                 addCard(container, item.name, item.path) {
-                    addInfoRow(it, "Current frequency", DeviceInfo.frequencyHz(item.currentFrequencyHz))
-                    addInfoRow(it, "Governor", item.governor ?: "Unsupported")
+                    addLiveInfoRow(it, "Current frequency", DeviceInfo.frequencyHz(item.currentFrequencyHz)) { current ->
+                        DeviceInfo.frequencyHz(current.devfreq.firstOrNull { entry -> entry.path == item.path }?.currentFrequencyHz)
+                    }
+                    addLiveInfoRow(it, "Governor", item.governor ?: "Unsupported") { current ->
+                        current.devfreq.firstOrNull { entry -> entry.path == item.path }?.governor ?: "Unsupported"
+                    }
                     addInfoRow(it, "Available frequency entries", item.availableFrequenciesHz.size.toString())
                 }
             }
         }
         addCard(container, "KERNEL-OWNED BOOST") {
-            addText(it, "Kernel-side transient boosts, including Zygote-triggered DDR bandwidth behavior when implemented by the running kernel, are not recreated by this app. This page reports exposed devfreq state only; it does not poll or inject a replacement boost.",
+            addText(it, "Kernel-managed boosts remain untouched. This page only reads devfreq state.",
                 SECONDARY, 12f)
         }
     }
 
     private fun renderMemory(container: LinearLayout, data: DeviceSnapshot) {
-        addPageHeading(container, "Memory", "RAM and ZRAM data read from system memory interfaces.")
+        addPageHeading(container, "Memory", "RAM and ZRAM telemetry.")
         addCard(container, "RAM") {
             val used = DeviceInfo.memoryUsedPercent(data)
             addInfoRow(it, "Total", data.memory.totalKb?.let { value -> formatKb(value) } ?: "Unsupported")
@@ -530,7 +594,7 @@ class HomeScreen(
             addInfoRow(it, "Original data", DeviceInfo.bytes(data.memory.zramOriginalBytes))
             addInfoRow(it, "Compressed data", DeviceInfo.bytes(data.memory.zramCompressedBytes))
             addInfoRow(it, "Memory consumed", DeviceInfo.bytes(data.memory.zramMemoryBytes))
-            addText(it, "ZRAM configuration is shown read-only; no swap or compression policy is changed.", MUTED, 11f, top = 8)
+            addText(it, "ZRAM settings are read-only.", MUTED, 11f, top = 8)
         }
         addCard(container, "KERNEL OPTIMIZATION TELEMETRY") { card ->
             val extra = data.kernelExtras
@@ -580,7 +644,7 @@ class HomeScreen(
     }
 
     private fun renderThermal(container: LinearLayout, data: DeviceSnapshot) {
-        addPageHeading(container, "Thermal sensors", "All detected thermal zones. No thermal policy writes are exposed.")
+        addPageHeading(container, "Thermal sensors", "Detected zones; thermal policy is read-only.")
         if (data.thermalSensors.isEmpty()) {
             addCard(container, "Thermal interface unavailable") {
                 addUnsupported(it, "No readable thermal zone temperature node was found.")
@@ -588,19 +652,32 @@ class HomeScreen(
         } else {
             data.thermalSensors.forEach { sensor ->
                 addCard(container, sensor.name) {
-                    addText(it, String.format(Locale.US, "%.1f °C", sensor.temperatureCelsius),
-                        if (sensor.temperatureCelsius >= 55.0) WARNING else ACCENT, 25f, bold = true)
+                    addLiveText(
+                        it,
+                        String.format(Locale.US, "%.1f °C", sensor.temperatureCelsius),
+                        if (sensor.temperatureCelsius >= 55.0) WARNING else ACCENT,
+                        25f,
+                        { current ->
+                            current.thermalSensors.firstOrNull { entry -> entry.name == sensor.name }?.let { entry ->
+                                String.format(Locale.US, "%.1f °C", entry.temperatureCelsius)
+                            } ?: "Unsupported"
+                        },
+                        { current ->
+                            current.thermalSensors.firstOrNull { entry -> entry.name == sensor.name }
+                                ?.let { entry -> if (entry.temperatureCelsius >= 55.0) WARNING else ACCENT }
+                        }
+                    ).apply { typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL) }
                 }
             }
         }
         addCard(container, "THERMAL SAFETY") {
-            addText(it, "Thermal throttling, trip points, cooling devices and shutdown protection remain controlled by the kernel and Android thermal framework. This app does not disable or raise thermal limits.",
+            addText(it, "Thermal throttling, trip points and shutdown protection remain kernel-managed.",
                 SECONDARY, 12f)
         }
     }
 
     private fun renderIo(container: LinearLayout, data: DeviceSnapshot) {
-        addPageHeading(container, "I/O scheduler", "Select only schedulers reported by each block device.")
+        addPageHeading(container, "I/O scheduler", "Available schedulers per device.")
         val readSectors = data.ioUsage.sectorsRead?.toString() ?: "Unsupported"
         val writtenSectors = data.ioUsage.sectorsWritten?.toString() ?: "Unsupported"
         addInfoCard(container, "Cumulative disk sectors", "Read: " + readSectors + " · Written: " + writtenSectors)
@@ -638,7 +715,7 @@ class HomeScreen(
     }
 
     private fun renderSystem(container: LinearLayout, data: DeviceSnapshot) {
-        addPageHeading(container, "System & diagnostics", "Battery, storage, network counters and kernel logs.")
+        addPageHeading(container, "System & diagnostics", "Battery, storage, network and dmesg.")
         addCard(container, "BATTERY") {
             addInfoRow(it, "Level", data.battery.levelPercent?.let { value -> "$value%" } ?: "Unsupported")
             addInfoRow(it, "State", when (data.battery.charging) {
@@ -665,7 +742,7 @@ class HomeScreen(
         addCard(container, "NETWORK") {
             addInfoRow(it, "Total RX", DeviceInfo.bytes(data.networkRxBytes))
             addInfoRow(it, "Total TX", DeviceInfo.bytes(data.networkTxBytes))
-            addText(it, "Android TrafficStats counters; cumulative since the system counter reset.", MUTED, 11f, top = 7)
+            addText(it, "TrafficStats totals since counter reset.", MUTED, 11f, top = 7)
             addText(it, "TCP congestion control", SECONDARY, 12f, bold = true, top = 12)
             addInfoRow(it, "Current algorithm", data.tcpCongestionControl ?: "Unsupported")
             if (data.availableTcpCongestionControls.isNotEmpty()) {
@@ -688,7 +765,7 @@ class HomeScreen(
             }
         }
         addCard(container, "KERNEL LOG") {
-            addText(it, "Read the latest kernel ring-buffer entries. Root access is required.", SECONDARY, 12f)
+            addText(it, "Read kernel ring buffer (root required).", SECONDARY, 12f)
             cardButton(it, "View dmesg") { onShowLogs() }
         }
         addCard(container, "BUILD INFORMATION") {
@@ -779,6 +856,57 @@ class HomeScreen(
             LayoutParams(WRAP_CONTENT, WRAP_CONTENT)
         )
         parent.addView(row, LayoutParams(MATCH_PARENT, WRAP_CONTENT))
+    }
+
+    private fun addLiveInfoRow(
+        parent: LinearLayout,
+        label: String,
+        initialValue: String,
+        valueProvider: (DeviceSnapshot) -> String
+    ) {
+        val row = LinearLayout(context).apply {
+            orientation = HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, dp(6), 0, dp(6))
+        }
+        row.addView(
+            TextView(context).apply {
+                text = t(label)
+                textSize = 12f
+                setTextColor(SECONDARY)
+            },
+            LayoutParams(0, WRAP_CONTENT, 1f)
+        )
+        val valueView = TextView(context).apply {
+            text = t(initialValue)
+            textSize = 12f
+            setTextColor(TEXT)
+            gravity = Gravity.END
+            maxWidth = dp(210)
+        }
+        row.addView(valueView, LayoutParams(WRAP_CONTENT, WRAP_CONTENT))
+        parent.addView(row, LayoutParams(MATCH_PARENT, WRAP_CONTENT))
+        liveBindings += { current ->
+            val next = t(valueProvider(current))
+            if (valueView.text.toString() != next) valueView.text = next
+        }
+    }
+
+    private fun addLiveText(
+        parent: LinearLayout,
+        initialValue: String,
+        initialColor: Int,
+        size: Float,
+        valueProvider: (DeviceSnapshot) -> String,
+        colorProvider: (DeviceSnapshot) -> Int?
+    ): TextView {
+        val valueView = addText(parent, initialValue, initialColor, size, bold = true)
+        liveBindings += { current ->
+            val next = t(valueProvider(current))
+            if (valueView.text.toString() != next) valueView.text = next
+            colorProvider(current)?.let(valueView::setTextColor)
+        }
+        return valueView
     }
 
     private fun addUnsupported(parent: LinearLayout, label: String) {
