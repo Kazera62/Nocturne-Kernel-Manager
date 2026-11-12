@@ -2,7 +2,7 @@
 
 Perubahan penting proyek dicatat di sini.
 
-## [0.1.1] - Foundation structure refinement
+## [Unreleased]
 
 ### Added
 - Pemisahan tampilan awal ke package `ui/home`.
