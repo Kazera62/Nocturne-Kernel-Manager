@@ -59,7 +59,26 @@ object UiText {
         "Kernel" to "Kernel",
         "Uptime" to "Waktu aktif",
         "Root access" to "Akses root",
+        "ROOT CHECK" to "CEK ROOT",
         "Root ready" to "Root aktif",
+        "DEVICE" to "PERANGKAT",
+        "ROOT ACCESS" to "AKSES ROOT",
+        "Uses the standard su command interface. Manager-specific APIs are not required for basic commands." to "Menggunakan antarmuka perintah su standar. API khusus root manager tidak diperlukan untuk perintah dasar.",
+        "CPU cpufreq policies" to "CPU cpufreq policy",
+        "Open CPU for available governor and frequency controls." to "Buka halaman Performa untuk kontrol governor dan frekuensi CPU.",
+        "CPU, virtual memory and storage scheduler controls." to "Kontrol CPU, memori virtual, dan scheduler penyimpanan.",
+        "Live hardware telemetry. Unsupported nodes are not simulated." to "Telemetry hardware langsung. Node yang tidak didukung tidak disimulasikan.",
+        "Application preferences and root diagnostics." to "Preferensi aplikasi dan diagnostik root.",
+        "Select a valid refresh interval." to "Pilih interval penyegaran yang valid.",
+        "Refresh interval updated." to "Interval penyegaran diperbarui.",
+        "Provider" to "Penyedia",
+        "Root access required" to "Akses root diperlukan",
+        "Read-only values remain available where Android permits. Grant root through your installed root manager to apply supported controls." to "Data yang hanya dibaca tetap tersedia sesuai izin Android. Berikan akses root melalui root manager untuk menerapkan kontrol yang didukung.",
+        "Apply governor and limits" to "Terapkan governor dan batas frekuensi",
+        "RAM" to "RAM",
+        "Read: " to "Dibaca: ",
+        "Core hotplug control is not enabled in this build. This page only observes the kernel state." to "Kontrol hotplug core belum diaktifkan pada build ini. Halaman ini hanya memantau status kernel."
+
         "Root off" to "Root tidak aktif",
         "Root status unknown" to "Status root belum diketahui",
         "Privileged shell verified" to "Shell dengan akses root terverifikasi",
@@ -225,10 +244,8 @@ object UiText {
     )
 
     fun translate(context: Context, source: String): String {
-        return if (UiPreferences.language(context) == "id") {
-            id[source] ?: source
-        } else {
-            source
-        }
+        if (UiPreferences.language(context) != "id") return source
+        if (source.startsWith("Core ")) return "Core " + source.removePrefix("Core ")
+        return id[source] ?: source
     }
 }
