@@ -26,7 +26,10 @@ data class GpuInfo(
     val maximumPowerLevel: Int? = null,
     val minimumPowerLevel: Int? = null,
     val numberOfPowerLevels: Int? = null,
-    val maximumClockHz: Long? = null
+    val maximumClockHz: Long? = null,
+    val availableFrequenciesMHz: List<Int> = emptyList(),
+    val minimumClockMHz: Int? = null,
+    val maximumClockMHz: Int? = null
 )
 
 data class DevfreqInfo(
@@ -37,6 +40,14 @@ data class DevfreqInfo(
     val availableFrequenciesHz: List<Long>,
     val minimumFrequencyHz: Long? = null,
     val maximumFrequencyHz: Long? = null
+)
+
+data class RegulatorTelemetry(
+    val name: String,
+    val voltageMicrovolts: Long?,
+    val minimumMicrovolts: Long?,
+    val maximumMicrovolts: Long?,
+    val state: String?
 )
 
 data class ThermalSensor(
@@ -102,6 +113,7 @@ data class DeviceSnapshot(
     val cpuCores: List<CpuCoreInfo>,
     val cpuPolicies: List<CpuPolicyInfo>,
     val gpu: GpuInfo,
+    val regulators: List<RegulatorTelemetry> = emptyList(),
     val devfreq: List<DevfreqInfo>,
     val ioSchedulers: List<IoSchedulerInfo>,
     val thermalSensors: List<ThermalSensor>,
