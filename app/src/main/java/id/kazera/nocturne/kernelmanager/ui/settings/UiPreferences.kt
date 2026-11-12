@@ -312,12 +312,44 @@ object UiText {
         "GPU maximum OPP set to " to "OPP maksimum GPU diatur ke ",
         "Thermal and voltage controls remain kernel-managed." to "Kontrol termal dan tegangan tetap dikelola kernel.",
         "GPU power-level read-back failed; previous limit was restored where possible." to "Baca ulang power level GPU gagal; batas sebelumnya dipulihkan bila memungkinkan.",
+        "CPU0 protected" to "CPU0 dilindungi",
+        "Protected" to "Dilindungi",
+        "CPU hotplug interface" to "Interface hotplug CPU",
+        "At least two cores must remain online. Runtime-only control." to "Minimal dua core harus tetap aktif. Kontrol hanya berlaku selama sesi berjalan.",
+        "Live fabric frequency limits" to "Batas frekuensi fabric aktif",
+        "Apply fabric limits" to "Terapkan batas fabric",
+        "Apply CCI and DDR frequency limits" to "Terapkan batas frekuensi CCI dan DDR",
+        "Invalid devfreq range." to "Rentang devfreq tidak valid.",
+        "No writable min_freq/max_freq pair. Telemetry only." to "Node min_freq/max_freq tidak dapat ditulis. Hanya telemetry.",
+        "Only live frequencies are selectable. Kernel-managed bandwidth boosts remain untouched." to "Hanya frekuensi aktif yang dapat dipilih. Boost bandwidth tetap dikelola kernel.",
+        "CPU0 is protected; supported secondary cores are 1–7." to "CPU0 dilindungi; core sekunder yang didukung adalah 1–7.",
+        "Selected CPU core is not present." to "Core CPU yang dipilih tidak tersedia.",
+        "CPU hotplug interface is unavailable." to "Interface hotplug CPU tidak tersedia.",
+        "At least two CPU cores must remain online." to "Minimal dua core CPU harus tetap aktif.",
+        "CPU hotplug write failed." to "Penulisan hotplug CPU gagal.",
+        "CPU hotplug read-back failed; previous state was restored where possible." to "Baca ulang hotplug CPU gagal; status sebelumnya dipulihkan bila memungkinkan.",
+        "Rejected unknown devfreq path." to "Path devfreq tidak dikenal ditolak.",
+        "Only detected CCI/DDR fabric nodes are supported." to "Hanya node fabric CCI/DDR yang terdeteksi yang didukung.",
+        "Selected values are not in the live devfreq table." to "Nilai yang dipilih tidak ada pada tabel devfreq aktif.",
+        "Writable min_freq/max_freq nodes are not exposed." to "Node min_freq/max_freq yang dapat ditulis tidak tersedia.",
+        "Devfreq range is already set." to "Rentang devfreq sudah sesuai.",
+        "Devfreq read-back failed; previous limits were restored where possible." to "Baca ulang devfreq gagal; batas sebelumnya dipulihkan bila memungkinkan.",
+        "Devfreq range updated for this boot session." to "Rentang devfreq diperbarui untuk sesi boot ini.",
         "CPU policy updated. Values are not guaranteed to persist after reboot." to "CPU policy diperbarui. Nilai belum tentu bertahan setelah reboot."
     )
 
     fun translate(context: Context, source: String): String {
         if (UiPreferences.language(context) != "id") return source
         if (source.startsWith("Core ")) return "Inti " + source.removePrefix("Core ")
+        val cpuState = Regex("^CPU([1-7]) is now (online|offline)\\.$").matchEntire(source)
+        if (cpuState != null) {
+            val state = if (cpuState.groupValues[2] == "online") "aktif" else "nonaktif"
+            return "Core ${cpuState.groupValues[1]} sekarang $state."
+        }
+        val cpuAlready = Regex("^CPU([1-7]) is already in the requested state\\.$").matchEntire(source)
+        if (cpuAlready != null) {
+            return "Core ${cpuAlready.groupValues[1]} sudah dalam status yang diminta."
+        }
         val gpuUpdatePrefix = "GPU maximum OPP set to "
         if (source.startsWith(gpuUpdatePrefix)) {
             return "OPP maksimum GPU diatur ke " +
