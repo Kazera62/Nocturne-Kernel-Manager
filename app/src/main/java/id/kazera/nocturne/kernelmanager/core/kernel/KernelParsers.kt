@@ -45,6 +45,15 @@ object KernelParsers {
         return temperature.takeIf { it in -20.0..150.0 }
     }
 
+    /**
+     * Restrict scheduler controls to whole physical storage devices.
+     * Partition nodes and virtual block devices are intentionally excluded.
+     */
+    fun isSupportedIoDevice(name: String): Boolean =
+        Regex("^mmcblk[0-9]+$").matches(name) ||
+            Regex("^sd[a-c]$").matches(name) ||
+            Regex("^nvme[0-9]+n[0-9]+$").matches(name)
+
     fun schedulerList(text: String?): Pair<String?, List<String>> {
         val tokens = text.orEmpty().trim().split(Regex("\\s+")).filter { it.isNotBlank() }
         val active = tokens.firstOrNull { it.startsWith("[") && it.endsWith("]") }
