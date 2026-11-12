@@ -61,8 +61,9 @@ DeviceSnapshot contains a single sample for the UI. Nullable fields represent un
 | --- | --- | --- |
 | CPU topology | /sys/devices/system/cpu/present, cpu*/online | Read-only |
 | CPU cpufreq | /sys/devices/system/cpu/cpufreq/policy*, legacy per-CPU cpufreq | Governor and min/max from live lists only |
-| GPU | KGSL and matching devfreq nodes | Read-only |
-| CCI / DDR | Matching /sys/class/devfreq/* nodes | Read-only |
+| GPU | /sys/class/kgsl/kgsl-3d0/gpu_available_frequencies, max_pwrlevel, min_pwrlevel, num_pwrlevels | Maximum power-level selector using a live OPP only; thermal_pwrlevel is never written |
+| CCI / DDR | Matching /sys/class/devfreq/* nodes | Read-only; optional min/max values are telemetry only |
+| Regulator | /sys/class/regulator/regulator*/ | Voltage/range/state telemetry only |
 | Thermal | /sys/class/thermal/thermal_zone*/ | Read-only |
 | Memory / ZRAM | /proc/meminfo, /sys/block/zram0/ | Read-only |
 | KSM | /sys/kernel/mm/ksm/ | Read-only |
@@ -109,7 +110,7 @@ The main navigation contains:
 - Monitor
 - System
 
-The Settings page is opened from the gear icon in the upper-right header. It manages language (en / id), refresh interval and root diagnostics.
+The Settings page is opened from the gear icon in the upper-right header. It manages language (en / id), refresh interval, root diagnostics and a default-off Advanced menu toggle. Enabling it adds an Advanced navigation page.
 
 UI preferences are stored locally with Android SharedPreferences.
 
@@ -126,11 +127,17 @@ Read-only features inspired by that review include CPU core online topology, ZRA
 Reference: https://github.com/SmartPack/SmartPack-Kernel-Manager
 The reference repository is archived and declares GPL-3.0.
 
+## Advanced runtime control boundary
+
+The Advanced menu is default-off. Its GPU control maps a selected frequency to the index in the live descending KGSL OPP list, validates it against num_pwrlevels and min_pwrlevel, writes only /sys/class/kgsl/kgsl-3d0/max_pwrlevel, then reads it back and attempts rollback on mismatch. It does not create OPPs or write thermal_pwrlevel.
+
+The SDM450 source defines Adreno 506 OPPs in DTB data. This app can select only entries exposed by the running kernel. Regulator and CPR voltage data is read-only; no validated runtime undervolt write interface is provided. CCI/DDR limits are also read-only in this release because a generic write interface was not established for this kernel.
+
 ## Safety limits
 
-- No GPU frequency writes, GPU overclock or maximum-clock cap.
+- No GPU OPP-table modification or frequency above the live OPP table.
 - No voltage overrides, regulator/CPR/corner or power-rail writes.
-- No DDR/RAM overclock.
+- No DDR/RAM overclock or devfreq writes.
 - No thermal trip-point or thermal-protection writes.
 - No CPU hotplug writes.
 - No arbitrary shell command field in the UI.
@@ -153,7 +160,7 @@ Telemetry refreshes only while the activity is resumed. The interval can be set 
 - Compile SDK 36
 - Target SDK 35
 - Minimum SDK 26
-- App version 0.3.0
+- App version 0.4.0
 
 Run:
 
