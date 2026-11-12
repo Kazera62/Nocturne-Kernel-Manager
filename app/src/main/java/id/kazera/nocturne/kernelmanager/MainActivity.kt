@@ -6,6 +6,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.view.WindowInsets
 import android.widget.ScrollView
 import android.widget.Toast
 import id.kazera.nocturne.kernelmanager.data.KernelRepository
@@ -20,7 +21,13 @@ import java.util.concurrent.atomic.AtomicBoolean
 class MainActivity : Activity() {
 
     private val repository = KernelRepository()
-    private val worker = Executors.newSingleThreadExecutor()
+    // All sysfs/procfs reads and SU commands are serialized on this dedicated I/O thread.
+    private val ioExecutor = Executors.newSingleThreadExecutor { task ->
+        Thread(task, "Nocturne-IO").apply {
+            priority = Thread.NORM_PRIORITY - 1
+            isDaemon = true
+        }
+    }
     private val mainHandler = Handler(Looper.getMainLooper())
     private val refreshInFlight = AtomicBoolean(false)
     private val rootRecheckInFlight = AtomicBoolean(false)
@@ -76,10 +83,11 @@ class MainActivity : Activity() {
             }
         )
         setContentView(screen)
+        installWindowInsets(screen)
 
         // Root preflight runs first and updates the UI before the broader node scan.
         // KernelRepository reuses this cached root session for subsequent sysfs reads.
-        worker.execute {
+        ioExecutor.execute {
             val access = try {
                 repository.checkRoot()
             } catch (error: Exception) {
@@ -98,6 +106,33 @@ class MainActivity : Activity() {
         }
     }
 
+    private fun installWindowInsets(view: HomeScreen) {
+        view.setOnApplyWindowInsetsListener { target, insets ->
+            val topInset: Int
+            val bottomInset: Int
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                topInset = insets.getInsets(
+                    WindowInsets.Type.statusBars() or WindowInsets.Type.displayCutout()
+                ).top
+                bottomInset = insets.getInsets(WindowInsets.Type.navigationBars()).bottom
+            } else {
+                @Suppress("DEPRECATION")
+                run {
+                    topInset = insets.systemWindowInsetTop
+                    bottomInset = insets.systemWindowInsetBottom
+                }
+            }
+            target.setPadding(
+                target.paddingLeft,
+                topInset,
+                target.paddingRight,
+                bottomInset
+            )
+            insets
+        }
+        view.requestApplyInsets()
+    }
+
     override fun onResume() {
         super.onResume()
         activityResumed = true
@@ -112,7 +147,7 @@ class MainActivity : Activity() {
 
     override fun onDestroy() {
         mainHandler.removeCallbacksAndMessages(null)
-        worker.shutdownNow()
+        ioExecutor.shutdownNow()
         repository.closeRootSession()
         super.onDestroy()
     }
@@ -124,7 +159,7 @@ class MainActivity : Activity() {
 
     private fun recheckRootAndRefresh() {
         if (!rootInitialized || !rootRecheckInFlight.compareAndSet(false, true)) return
-        worker.execute {
+        ioExecutor.execute {
             repository.invalidateRootCache()
             val access = try {
                 repository.checkRoot()
@@ -146,7 +181,7 @@ class MainActivity : Activity() {
 
     private fun refresh(forceRender: Boolean = false) {
         if (!refreshInFlight.compareAndSet(false, true)) return
-        worker.execute {
+        ioExecutor.execute {
             val result = try {
                 repository.snapshot(applicationContext)
             } catch (_: Exception) {
@@ -165,7 +200,7 @@ class MainActivity : Activity() {
         minimum: Long,
         maximum: Long
     ) {
-        worker.execute {
+        ioExecutor.execute {
             val result = repository.applyCpuPolicy(policy, governor, minimum, maximum)
             runOnUiThread {
                 Toast.makeText(this, UiText.translate(this, result.message), Toast.LENGTH_LONG).show()
@@ -175,7 +210,7 @@ class MainActivity : Activity() {
     }
 
     private fun applyIoScheduler(scheduler: IoSchedulerInfo, selected: String) {
-        worker.execute {
+        ioExecutor.execute {
             val result = repository.applyIoScheduler(scheduler, selected)
             runOnUiThread {
                 Toast.makeText(this, UiText.translate(this, result.message), Toast.LENGTH_LONG).show()
@@ -185,7 +220,7 @@ class MainActivity : Activity() {
     }
 
     private fun applyVmSettings(swappiness: Int, cachePressure: Int) {
-        worker.execute {
+        ioExecutor.execute {
             val result = repository.applyVmSettings(swappiness, cachePressure)
             runOnUiThread {
                 Toast.makeText(this, UiText.translate(this, result.message), Toast.LENGTH_LONG).show()
@@ -195,7 +230,7 @@ class MainActivity : Activity() {
     }
 
     private fun applyTcpCongestionControl(selected: String) {
-        worker.execute {
+        ioExecutor.execute {
             val result = repository.applyTcpCongestionControl(selected)
             runOnUiThread {
                 Toast.makeText(this, UiText.translate(this, result.message), Toast.LENGTH_LONG).show()
@@ -205,7 +240,7 @@ class MainActivity : Activity() {
     }
 
     private fun showKernelLogs() {
-        worker.execute {
+        ioExecutor.execute {
             val result = repository.kernelLogs()
             runOnUiThread {
                 if (isFinishing) return@runOnUiThread
