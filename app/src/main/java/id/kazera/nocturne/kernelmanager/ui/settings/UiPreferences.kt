@@ -387,6 +387,9 @@ object UiText {
         "Risk: raising hispeed frequency or lowering hispeed load can increase boost activity, power draw and heat. Extreme rate limits may cause sluggish response or frequent frequency changes." to "Risiko: menaikkan frekuensi hispeed atau menurunkan hispeed load dapat meningkatkan boost, konsumsi daya, dan suhu. Batas laju ekstrem dapat membuat respons lambat atau frekuensi terlalu sering berubah.",
         "Global schedutil tunables" to "Tunable schedutil global",
         "Per-policy schedutil tunables" to "Tunable schedutil per-policy",
+        "WALT PL utilization" to "Utilisasi WALT PL",
+        "Include PL contribution in schedutil demand." to "Sertakan kontribusi PL dalam demand schedutil.",
+        "WALT PL controls whether PL utilization contributes to schedutil demand. Disabling it can change boost response and workload performance." to "WALT PL menentukan apakah utilisasi PL ikut dihitung dalam demand schedutil. Menonaktifkannya dapat mengubah respons boost dan performa beban kerja.",
         "CPU policy updated. Values are not guaranteed to persist after reboot." to "CPU policy diperbarui. Nilai belum tentu bertahan setelah reboot."
     )
 
