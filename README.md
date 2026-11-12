@@ -35,7 +35,7 @@ Daftar tersebut adalah target awal proyek. Kompatibilitas semua SKU regional, fi
 | Minimum SDK | Android API 26 |
 | Application ID | `id.kazera.nocturne.kernelmanager` |
 
-Kotlin plugin dikelola secara eksplisit dan terpisah dari integrasi Kotlin bawaan AGP agar versi compiler dapat dipelihara secara terkontrol.
+Kompilasi Kotlin menggunakan dukungan Kotlin bawaan Android Gradle Plugin 9.4.0. Tidak ada plugin Kotlin Android eksternal yang diterapkan.
 
 ## Build
 
