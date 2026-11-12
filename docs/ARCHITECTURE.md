@@ -91,7 +91,7 @@ Frequency controls are hidden when current min/max values are unavailable or do 
 
 ### I/O scheduler
 
-The repository validates the scheduler path, re-reads its available values and checks that the selected scheduler remains available before writing. It then reads back the active scheduler.
+The repository validates the physical device name and canonical scheduler path, re-reads its available values and checks that the selected scheduler remains available before writing. RootShell enforces the same physical-device allowlist again. It then reads back the active scheduler.
 
 ### VM parameters
 
