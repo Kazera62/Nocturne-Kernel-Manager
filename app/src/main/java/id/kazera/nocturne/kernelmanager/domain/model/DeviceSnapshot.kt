@@ -51,6 +51,18 @@ data class MemoryInfo(
     val vfsCachePressure: Int?
 )
 
+data class KernelExtras(
+    val zramCompressionAlgorithm: String?,
+    val availableZramCompressionAlgorithms: List<String>,
+    val ksmSupported: Boolean,
+    val ksmEnabled: Boolean?,
+    val ksmPagesShared: Long?,
+    val ksmPagesSharing: Long?,
+    val entropyAvailable: Int?,
+    val entropyReadWakeupThreshold: Int?,
+    val entropyWriteWakeupThreshold: Int?
+)
+
 data class BatteryInfo(
     val levelPercent: Int?,
     val temperatureCelsius: Double?,
@@ -82,6 +94,7 @@ data class DeviceSnapshot(
     val ioSchedulers: List<IoSchedulerInfo>,
     val thermalSensors: List<ThermalSensor>,
     val memory: MemoryInfo,
+    val kernelExtras: KernelExtras,
     val battery: BatteryInfo,
     val storage: StorageInfo,
     val networkRxBytes: Long?,
