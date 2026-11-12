@@ -49,6 +49,8 @@ object KernelParsers {
      * Restrict scheduler controls to whole physical storage devices.
      * Partition nodes and virtual block devices are intentionally excluded.
      */
+    fun isSupportedCpuHotplugCore(coreId: Int): Boolean = coreId in 1..7
+
     fun isSupportedIoDevice(name: String): Boolean =
         Regex("^mmcblk[0-9]+$").matches(name) ||
             Regex("^sd[a-c]$").matches(name) ||
