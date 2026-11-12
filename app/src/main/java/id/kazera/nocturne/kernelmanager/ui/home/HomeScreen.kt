@@ -8,7 +8,6 @@ import android.view.View
 import android.view.ViewGroup
 import android.content.res.ColorStateList
 import android.widget.ArrayAdapter
-import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.SeekBar
@@ -19,6 +18,9 @@ import id.kazera.nocturne.kernelmanager.data.DeviceInfo
 import id.kazera.nocturne.kernelmanager.domain.model.CpuPolicyInfo
 import id.kazera.nocturne.kernelmanager.domain.model.DeviceSnapshot
 import id.kazera.nocturne.kernelmanager.domain.model.IoSchedulerInfo
+import id.kazera.nocturne.kernelmanager.core.privilege.RootAccess
+import id.kazera.nocturne.kernelmanager.ui.settings.UiPreferences
+import id.kazera.nocturne.kernelmanager.ui.settings.UiText
 import java.util.Locale
 
 class HomeScreen(
@@ -28,23 +30,31 @@ class HomeScreen(
     private val onIoApply: (IoSchedulerInfo, String) -> Unit,
     private val onVmApply: (Int, Int) -> Unit,
     private val onTcpApply: (String) -> Unit,
-    private val onShowLogs: () -> Unit
+    private val onShowLogs: () -> Unit,
+    private val onRootRefresh: () -> Unit,
+    private val onLanguageChanged: (String) -> Unit,
+    private val onRefreshIntervalChanged: (Int) -> Unit
 ) : LinearLayout(context) {
 
-    private enum class Page(val label: String) {
-        OVERVIEW("Overview"),
-        CPU("CPU"),
-        GPU("GPU"),
-        FABRIC("CCI / DDR"),
-        MEMORY("Memory"),
-        THERMAL("Thermal"),
-        IO("I/O"),
-        SYSTEM("System")
+    private enum class Page(val label: String, val icon: String) {
+        OVERVIEW("Overview", "⌂"),
+        PERFORMANCE("Performance", "⚡"),
+        MONITOR("Monitor", "◉"),
+        SYSTEM("System", "▦"),
+        SETTINGS("Settings", "⚙")
     }
 
     private var selectedPage = Page.OVERVIEW
     private var snapshot: DeviceSnapshot? = null
+    private var rootStatus: RootAccess? = null
     private var currentScroll: ScrollView? = null
+
+    private fun t(value: String): String = UiText.translate(context, value)
+
+    fun updateRootStatus(value: RootAccess) {
+        rootStatus = value
+        render(restoreScroll = true)
+    }
 
     init {
         orientation = VERTICAL
@@ -65,7 +75,6 @@ class HomeScreen(
         removeAllViews()
 
         addView(buildHeader(), LayoutParams(MATCH_PARENT, WRAP_CONTENT))
-        addView(buildNavigation(), LayoutParams(MATCH_PARENT, dp(54)))
 
         val scroll = ScrollView(context).apply {
             isFillViewport = true
@@ -80,23 +89,33 @@ class HomeScreen(
         }
         scroll.addView(content, ViewGroup.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
         addView(scroll, LayoutParams(MATCH_PARENT, 0, 1f))
+        addView(buildNavigation(), LayoutParams(MATCH_PARENT, dp(66)))
 
         val data = snapshot
-        if (data == null) {
+        if (data == null && selectedPage != Page.SETTINGS) {
             addCard(content, "Initializing device interface") {
-                addText(it, "Reading device information and probing available kernel nodes…", SECONDARY, 14f)
-                addText(it, "No sample or placeholder telemetry is displayed.", MUTED, 12f, top = 8)
+                val root = rootStatus
+                if (root == null) {
+                    addText(it, "Checking root access before scanning kernel interfaces…", SECONDARY, 14f)
+                } else {
+                    addText(
+                        it,
+                        if (root.available) "Privileged shell verified" else "Root permission not available",
+                        if (root.available) ACCENT else WARNING,
+                        14f,
+                        bold = true
+                    )
+                    addText(it, root.detail, MUTED, 12f, top = 6)
+                    addText(it, "Reading device information and probing available kernel nodes…", SECONDARY, 12f, top = 10)
+                }
             }
         } else {
             when (selectedPage) {
-                Page.OVERVIEW -> renderOverview(content, data)
-                Page.CPU -> renderCpu(content, data)
-                Page.GPU -> renderGpu(content, data)
-                Page.FABRIC -> renderFabric(content, data)
-                Page.MEMORY -> renderMemory(content, data)
-                Page.THERMAL -> renderThermal(content, data)
-                Page.IO -> renderIo(content, data)
-                Page.SYSTEM -> renderSystem(content, data)
+                Page.OVERVIEW -> data?.let { renderOverview(content, it) }
+                Page.PERFORMANCE -> data?.let { renderPerformance(content, it) }
+                Page.MONITOR -> data?.let { renderMonitor(content, it) }
+                Page.SYSTEM -> data?.let { renderSystem(content, it) }
+                Page.SETTINGS -> renderSettings(content, data)
             }
         }
 
@@ -107,49 +126,55 @@ class HomeScreen(
         val header = LinearLayout(context).apply {
             orientation = HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(18), dp(15), dp(16), dp(12))
+            setPadding(dp(18), dp(12), dp(16), dp(10))
             setBackgroundColor(BACKGROUND)
         }
 
         val titleStack = LinearLayout(context).apply { orientation = VERTICAL }
-        val title = addText(titleStack, "NOCTURNE", TEXT, 20f, bold = true)
-        title.letterSpacing = 0.12f
-        addText(titleStack, "KERNEL MANAGER  ·  M11 / A11", SECONDARY, 10f, top = 3)
+        val title = addText(titleStack, "NOCTURNE", TEXT, 21f, bold = true)
+        title.letterSpacing = 0.14f
+        addText(titleStack, "KERNEL MANAGER  ·  M11 / A11", SECONDARY, 10f, top = 2)
         header.addView(titleStack, LayoutParams(0, WRAP_CONTENT, 1f))
 
-        val root = snapshot?.root
-        val rootText = if (root?.available == true) "ROOT READY" else "ROOT OFF"
-        val rootColor = if (root?.available == true) ACCENT else WARNING
-        header.addView(chip(rootText, rootColor), LayoutParams(WRAP_CONTENT, dp(30)))
-        val refresh = actionButton("↻", "Refresh") { onRefresh() }.apply {
-            textSize = 20f
-            setPadding(dp(8), 0, dp(8), 0)
+        val currentRoot = rootStatus ?: snapshot?.root
+        val rootLabel = when {
+            currentRoot == null -> "ROOT CHECK"
+            currentRoot.available -> "Root ready"
+            else -> "Root off"
         }
-        val refreshParams = LayoutParams(dp(42), dp(38)).apply { leftMargin = dp(8) }
-        header.addView(refresh, refreshParams)
+        val rootColor = if (currentRoot?.available == true) ACCENT else WARNING
+        header.addView(chip(rootLabel, rootColor), LayoutParams(WRAP_CONTENT, dp(30)))
+
+        val refresh = iconButton("↻", "Refresh") { onRefresh() }
+        header.addView(refresh, LayoutParams(dp(40), dp(40)).apply { leftMargin = dp(6) })
+
+        val settings = iconButton("⚙", "Settings") {
+            selectedPage = Page.SETTINGS
+            render()
+        }
+        header.addView(settings, LayoutParams(dp(40), dp(40)).apply { leftMargin = dp(4) })
         return header
     }
 
     private fun buildNavigation(): View {
-        val horizontal = HorizontalScrollView(context).apply {
-            isHorizontalScrollBarEnabled = false
-            clipToPadding = false
-            setPadding(dp(12), dp(4), dp(12), dp(4))
-        }
         val row = LinearLayout(context).apply {
             orientation = HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
+            gravity = Gravity.CENTER
+            setPadding(dp(8), dp(6), dp(8), dp(6))
+            setBackgroundColor(SURFACE)
         }
-        Page.values().forEach { page ->
+
+        Page.values().filter { it != Page.SETTINGS }.forEach { page ->
             val selected = page == selectedPage
-            val button = TextView(context).apply {
-                text = page.label
-                textSize = 12f
-                typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
-                setTextColor(if (selected) BACKGROUND else SECONDARY)
+            val item = LinearLayout(context).apply {
+                orientation = VERTICAL
                 gravity = Gravity.CENTER
-                setPadding(dp(13), 0, dp(13), 0)
-                background = rounded(if (selected) ACCENT else SURFACE, if (selected) ACCENT else BORDER, 22f)
+                setPadding(dp(4), dp(3), dp(4), dp(3))
+                background = rounded(
+                    if (selected) SURFACE_ALT else SURFACE,
+                    if (selected) ACCENT else SURFACE,
+                    12f
+                )
                 isClickable = true
                 isFocusable = true
                 setOnClickListener {
@@ -157,12 +182,42 @@ class HomeScreen(
                     render()
                 }
             }
-            val params = LayoutParams(WRAP_CONTENT, dp(38)).apply { rightMargin = dp(7) }
-            row.addView(button, params)
+            val icon = TextView(context).apply {
+                text = page.icon
+                textSize = 19f
+                gravity = Gravity.CENTER
+                setTextColor(if (selected) ACCENT else MUTED)
+            }
+            val label = TextView(context).apply {
+                text = t(page.label)
+                textSize = 10f
+                gravity = Gravity.CENTER
+                typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+                setTextColor(if (selected) TEXT else SECONDARY)
+                maxLines = 1
+            }
+            item.addView(icon, LayoutParams(MATCH_PARENT, dp(25)))
+            item.addView(label, LayoutParams(MATCH_PARENT, dp(16)))
+            row.addView(item, LayoutParams(0, MATCH_PARENT, 1f).apply {
+                leftMargin = dp(3)
+                rightMargin = dp(3)
+            })
         }
-        horizontal.addView(row)
-        return horizontal
+        return row
     }
+
+    private fun iconButton(icon: String, description: String, action: () -> Unit): TextView =
+        TextView(context).apply {
+            text = icon
+            contentDescription = t(description)
+            textSize = 20f
+            gravity = Gravity.CENTER
+            setTextColor(TEXT)
+            background = rounded(SURFACE_ALT, BORDER, 12f)
+            isClickable = true
+            isFocusable = true
+            setOnClickListener { action() }
+        }
 
     private fun renderOverview(container: LinearLayout, data: DeviceSnapshot) {
         addPageHeading(container, "Device overview", "Live readings from interfaces available on this device.")
