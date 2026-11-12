@@ -12,6 +12,8 @@ import id.kazera.nocturne.kernelmanager.data.KernelRepository
 import id.kazera.nocturne.kernelmanager.domain.model.CpuPolicyInfo
 import id.kazera.nocturne.kernelmanager.domain.model.IoSchedulerInfo
 import id.kazera.nocturne.kernelmanager.ui.home.HomeScreen
+import id.kazera.nocturne.kernelmanager.ui.settings.UiPreferences
+import id.kazera.nocturne.kernelmanager.ui.settings.UiText
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -23,15 +25,27 @@ class MainActivity : Activity() {
     private val refreshInFlight = AtomicBoolean(false)
     private lateinit var screen: HomeScreen
 
+    @Volatile
+    private var rootInitialized = false
+
+    @Volatile
+    private var activityResumed = false
+
+    @Volatile
+    private var refreshIntervalMs = 8_000L
+
     private val refreshLoop = object : Runnable {
         override fun run() {
+            if (!activityResumed) return
             refresh()
-            mainHandler.postDelayed(this, REFRESH_INTERVAL_MS)
+            mainHandler.postDelayed(this, refreshIntervalMs)
         }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        refreshIntervalMs = UiPreferences.refreshIntervalSeconds(this) * 1_000L
 
         window.statusBarColor = 0xFF080B10.toInt()
         window.navigationBarColor = 0xFF080B10.toInt()
@@ -42,25 +56,55 @@ class MainActivity : Activity() {
 
         screen = HomeScreen(
             context = this,
-            onRefresh = { refresh(forceRender = true) },
+            onRefresh = { recheckRootAndRefresh() },
             onCpuApply = { policy, governor, minimum, maximum ->
                 applyCpu(policy, governor, minimum, maximum)
             },
             onIoApply = { scheduler, selected -> applyIoScheduler(scheduler, selected) },
             onVmApply = { swappiness, cachePressure -> applyVmSettings(swappiness, cachePressure) },
             onTcpApply = { selected -> applyTcpCongestionControl(selected) },
-            onShowLogs = { showKernelLogs() }
+            onShowLogs = { showKernelLogs() },
+            onRootRefresh = { recheckRootAndRefresh() },
+            onLanguageChanged = { language ->
+                UiPreferences.setLanguage(this, language)
+            },
+            onRefreshIntervalChanged = { seconds ->
+                UiPreferences.setRefreshIntervalSeconds(this, seconds)
+                refreshIntervalMs = seconds * 1_000L
+                if (activityResumed && rootInitialized) startRefreshLoop()
+            }
         )
         setContentView(screen)
+
+        // Root preflight runs first and updates the UI before the broader node scan.
+        // KernelRepository reuses this cached root session for subsequent sysfs reads.
+        worker.execute {
+            val access = try {
+                repository.checkRoot()
+            } catch (error: Exception) {
+                id.kazera.nocturne.kernelmanager.core.privilege.RootAccess(
+                    available = false,
+                    provider = "No root access",
+                    detail = error.message ?: "Root preflight failed."
+                )
+            }
+            runOnUiThread {
+                if (isFinishing) return@runOnUiThread
+                rootInitialized = true
+                screen.updateRootStatus(access)
+                if (activityResumed) startRefreshLoop()
+            }
+        }
     }
 
     override fun onResume() {
         super.onResume()
-        mainHandler.removeCallbacks(refreshLoop)
-        refreshLoop.run()
+        activityResumed = true
+        if (rootInitialized) startRefreshLoop()
     }
 
     override fun onPause() {
+        activityResumed = false
         mainHandler.removeCallbacks(refreshLoop)
         super.onPause()
     }
@@ -68,12 +112,44 @@ class MainActivity : Activity() {
     override fun onDestroy() {
         mainHandler.removeCallbacksAndMessages(null)
         worker.shutdownNow()
+        repository.closeRootSession()
         super.onDestroy()
+    }
+
+    private fun startRefreshLoop() {
+        mainHandler.removeCallbacks(refreshLoop)
+        refreshLoop.run()
+    }
+
+    private fun recheckRootAndRefresh() {
+        if (!rootInitialized || !refreshInFlight.compareAndSet(false, true)) {
+            if (rootInitialized) {
+                refresh(forceRender = true)
+            }
+            return
+        }
+        worker.execute {
+            repository.invalidateRootCache()
+            val access = try {
+                repository.checkRoot()
+            } catch (error: Exception) {
+                id.kazera.nocturne.kernelmanager.core.privilege.RootAccess(
+                    available = false,
+                    provider = "No root access",
+                    detail = error.message ?: "Root check failed."
+                )
+            }
+            runOnUiThread {
+                refreshInFlight.set(false)
+                if (isFinishing) return@runOnUiThread
+                screen.updateRootStatus(access)
+                refresh(forceRender = true)
+            }
+        }
     }
 
     private fun refresh(forceRender: Boolean = false) {
         if (!refreshInFlight.compareAndSet(false, true)) return
-        if (forceRender) repository.invalidateRootCache()
         worker.execute {
             val result = try {
                 repository.snapshot(applicationContext)
@@ -96,7 +172,7 @@ class MainActivity : Activity() {
         worker.execute {
             val result = repository.applyCpuPolicy(policy, governor, minimum, maximum)
             runOnUiThread {
-                Toast.makeText(this, result.message, Toast.LENGTH_LONG).show()
+                Toast.makeText(this, UiText.translate(this, result.message), Toast.LENGTH_LONG).show()
                 refresh(forceRender = true)
             }
         }
@@ -106,7 +182,7 @@ class MainActivity : Activity() {
         worker.execute {
             val result = repository.applyIoScheduler(scheduler, selected)
             runOnUiThread {
-                Toast.makeText(this, result.message, Toast.LENGTH_LONG).show()
+                Toast.makeText(this, UiText.translate(this, result.message), Toast.LENGTH_LONG).show()
                 refresh(forceRender = true)
             }
         }
@@ -116,7 +192,7 @@ class MainActivity : Activity() {
         worker.execute {
             val result = repository.applyVmSettings(swappiness, cachePressure)
             runOnUiThread {
-                Toast.makeText(this, result.message, Toast.LENGTH_LONG).show()
+                Toast.makeText(this, UiText.translate(this, result.message), Toast.LENGTH_LONG).show()
                 refresh(forceRender = true)
             }
         }
@@ -126,7 +202,7 @@ class MainActivity : Activity() {
         worker.execute {
             val result = repository.applyTcpCongestionControl(selected)
             runOnUiThread {
-                Toast.makeText(this, result.message, Toast.LENGTH_LONG).show()
+                Toast.makeText(this, UiText.translate(this, result.message), Toast.LENGTH_LONG).show()
                 refresh(forceRender = true)
             }
         }
@@ -147,15 +223,11 @@ class MainActivity : Activity() {
                 }
                 val scroll = ScrollView(this).apply { addView(body) }
                 AlertDialog.Builder(this)
-                    .setTitle("Latest kernel log")
+                    .setTitle(UiText.translate(this, "Latest kernel log"))
                     .setView(scroll)
-                    .setPositiveButton("Close", null)
+                    .setPositiveButton(UiText.translate(this, "Close"), null)
                     .show()
             }
         }
-    }
-
-    companion object {
-        private const val REFRESH_INTERVAL_MS = 8_000L
     }
 }
