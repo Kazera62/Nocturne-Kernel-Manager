@@ -469,7 +469,7 @@ class HomeScreen(
                 MUTED, 11f, top = 8)
         }
         addCard(container, "Control boundary") {
-            addText(it, "Frequencies are validated against live OPPs. Failed writes restore previous limits; voltage nodes stay untouched.",
+            addText(it, "Live OPP validation. Failed writes restore limits; voltage nodes are untouched.",
                 SECONDARY, 12f)
         }
     }
