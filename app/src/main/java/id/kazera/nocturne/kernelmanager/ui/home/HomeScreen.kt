@@ -253,7 +253,7 @@ class HomeScreen(
                     MUTED, 11f, top = 10)
             } else if (policy.availableGovernors.isNotEmpty()) {
                 addText(card, "Governor", SECONDARY, 12f, bold = true, top = 12)
-                val governorOptions = if (policy.governor in policy.availableGovernors) {
+                val governorOptions = if (policy.governor != null && policy.governor in policy.availableGovernors) {
                     policy.availableGovernors
                 } else {
                     listOf("Keep current") + policy.availableGovernors
@@ -417,7 +417,8 @@ class HomeScreen(
                 addCard(container, scheduler.deviceName, scheduler.path) { card ->
                     addInfoRow(card, "Active scheduler", scheduler.activeScheduler ?: "Unknown")
                     addInfoRow(card, "Available", scheduler.availableSchedulers.joinToString(", "))
-                    val schedulerOptions = if (scheduler.activeScheduler in scheduler.availableSchedulers) {
+                    val schedulerOptions = if (scheduler.activeScheduler != null &&
+                        scheduler.activeScheduler in scheduler.availableSchedulers) {
                         scheduler.availableSchedulers
                     } else {
                         listOf("Keep current") + scheduler.availableSchedulers
@@ -470,7 +471,8 @@ class HomeScreen(
             addText(it, "TCP congestion control", SECONDARY, 12f, bold = true, top = 12)
             addInfoRow(it, "Current algorithm", data.tcpCongestionControl ?: "Unsupported")
             if (data.availableTcpCongestionControls.isNotEmpty()) {
-                val tcpOptions = if (data.tcpCongestionControl in data.availableTcpCongestionControls) {
+                val tcpOptions = if (data.tcpCongestionControl != null &&
+                    data.tcpCongestionControl in data.availableTcpCongestionControls) {
                     data.availableTcpCongestionControls
                 } else {
                     listOf("Keep current") + data.availableTcpCongestionControls
