@@ -15,6 +15,13 @@ class KernelParsersTest {
     }
 
     @Test
+    fun parsesSparseCpuPresentLists() {
+        assertEquals(listOf(0, 1, 2, 4, 7), KernelParsers.cpuList("0-2,4,7"))
+        assertEquals(listOf(0, 2, 3, 4), KernelParsers.cpuList("0,2-4"))
+        assertEquals(emptyList<Int>(), KernelParsers.cpuList("invalid,4-2,999-1000"))
+    }
+
+    @Test
     fun rejectsInvalidGpuUtilization() {
         assertNull(KernelParsers.gpuUtilization("not-a-counter"))
         assertNull(KernelParsers.gpuUtilization("100 0"))
