@@ -46,7 +46,9 @@ data class MemoryInfo(
     val zramDiskBytes: Long?,
     val zramOriginalBytes: Long?,
     val zramCompressedBytes: Long?,
-    val zramMemoryBytes: Long?
+    val zramMemoryBytes: Long?,
+    val swappiness: Int?,
+    val vfsCachePressure: Int?
 )
 
 data class BatteryInfo(
@@ -85,5 +87,7 @@ data class DeviceSnapshot(
     val networkRxBytes: Long?,
     val networkTxBytes: Long?,
     val ioUsage: IoUsage,
+    val tcpCongestionControl: String?,
+    val availableTcpCongestionControls: List<String>,
     val warnings: List<String>
 )
