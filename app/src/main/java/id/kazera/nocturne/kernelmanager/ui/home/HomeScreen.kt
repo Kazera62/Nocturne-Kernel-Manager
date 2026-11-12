@@ -6,10 +6,12 @@ import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
+import android.content.res.ColorStateList
 import android.widget.ArrayAdapter
 import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
 import android.widget.ScrollView
+import android.widget.SeekBar
 import android.widget.Spinner
 import android.widget.TextView
 import id.kazera.nocturne.kernelmanager.core.kernel.KernelParsers
@@ -24,6 +26,8 @@ class HomeScreen(
     private val onRefresh: () -> Unit,
     private val onCpuApply: (CpuPolicyInfo, String?, Long, Long) -> Unit,
     private val onIoApply: (IoSchedulerInfo, String) -> Unit,
+    private val onVmApply: (Int, Int) -> Unit,
+    private val onTcpApply: (String) -> Unit,
     private val onShowLogs: () -> Unit
 ) : LinearLayout(context) {
 
@@ -50,7 +54,8 @@ class HomeScreen(
 
     fun update(value: DeviceSnapshot, forceRender: Boolean = false) {
         snapshot = value
-        if (forceRender || (selectedPage != Page.CPU && selectedPage != Page.IO)) {
+        if (forceRender || (selectedPage != Page.CPU && selectedPage != Page.IO &&
+                selectedPage != Page.MEMORY && selectedPage != Page.SYSTEM)) {
             render(restoreScroll = true)
         }
     }
@@ -329,6 +334,31 @@ class HomeScreen(
             addInfoRow(it, "Memory consumed", DeviceInfo.bytes(data.memory.zramMemoryBytes))
             addText(it, "ZRAM configuration is shown read-only; no swap or compression policy is changed.", MUTED, 11f, top = 8)
         }
+        addCard(container, "VIRTUAL MEMORY TUNING", "Runtime VM parameters · current boot session") { card ->
+            val swappiness = data.memory.swappiness
+            val cachePressure = data.memory.vfsCachePressure
+            addInfoRow(card, "Current swappiness", swappiness?.toString() ?: "Unsupported")
+            addInfoRow(card, "Current VFS cache pressure", cachePressure?.toString() ?: "Unsupported")
+            if (swappiness in 0..100 && cachePressure in 10..200) {
+                val swappinessBar = addSeekControl(card, "Swappiness", swappiness, 0, 100)
+                val cacheBar = addSeekControl(card, "VFS cache pressure", cachePressure, 10, 200)
+                card.addView(
+                    actionButton("Apply VM settings", "Apply virtual memory settings") {
+                        if (!data.root.available) {
+                            toast("Root permission is required.")
+                        } else {
+                            val selectedSwappiness = (swappinessBar.tag as Int) + swappinessBar.progress
+                            val selectedCache = (cacheBar.tag as Int) + cacheBar.progress
+                            onVmApply(selectedSwappiness, selectedCache)
+                        }
+                    },
+                    LayoutParams(MATCH_PARENT, dp(46)).apply { topMargin = dp(12) }
+                )
+            } else {
+                addUnsupported(card, "VM tuning nodes or current values outside supported ranges")
+            }
+            if (!data.root.available) addText(card, "Root permission is required to apply changes.", WARNING, 11f, top = 8)
+        }
     }
 
     private fun renderThermal(container: LinearLayout, data: DeviceSnapshot) {
@@ -408,6 +438,18 @@ class HomeScreen(
             addInfoRow(it, "Total RX", DeviceInfo.bytes(data.networkRxBytes))
             addInfoRow(it, "Total TX", DeviceInfo.bytes(data.networkTxBytes))
             addText(it, "Android TrafficStats counters; cumulative since the system counter reset.", MUTED, 11f, top = 7)
+            addText(it, "TCP congestion control", SECONDARY, 12f, bold = true, top = 12)
+            addInfoRow(it, "Current algorithm", data.tcpCongestionControl ?: "Unsupported")
+            if (data.availableTcpCongestionControls.isNotEmpty()) {
+                val picker = spinner(data.availableTcpCongestionControls, data.tcpCongestionControl)
+                it.addView(picker, LayoutParams(MATCH_PARENT, dp(46)))
+                cardButton(it, "Apply TCP algorithm") {
+                    if (!data.root.available) toast("Root permission is required.")
+                    else picker.selectedItem?.toString()?.let { selected -> onTcpApply(selected) }
+                }
+            } else {
+                addUnsupported(it, "Available TCP congestion algorithms")
+            }
         }
         addCard(container, "KERNEL LOG") {
             addText(it, "Read the latest kernel ring-buffer entries. Root access is required.", SECONDARY, 12f)
@@ -546,6 +588,33 @@ class HomeScreen(
         if (index >= 0) spinner.setSelection(index)
         spinner.background = rounded(SURFACE_ALT, BORDER, 10f)
         return spinner
+    }
+
+    private fun addSeekControl(
+        parent: LinearLayout,
+        label: String,
+        current: Int,
+        minimum: Int,
+        maximum: Int
+    ): SeekBar {
+        addText(parent, label, SECONDARY, 12f, bold = true, top = 10)
+        val valueLabel = addText(parent, current.toString(), TEXT, 13f, top = 3)
+        val seek = SeekBar(context).apply {
+            max = maximum - minimum
+            progress = (current - minimum).coerceIn(0, max)
+            tag = minimum
+            progressTintList = ColorStateList.valueOf(ACCENT)
+            thumbTintList = ColorStateList.valueOf(ACCENT)
+            setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                    valueLabel.text = (minimum + progress).toString()
+                }
+                override fun onStartTrackingTouch(seekBar: SeekBar?) = Unit
+                override fun onStopTrackingTouch(seekBar: SeekBar?) = Unit
+            })
+        }
+        parent.addView(seek, LayoutParams(MATCH_PARENT, dp(42)))
+        return seek
     }
 
     private fun frequencySpinner(values: List<Long>, selected: Long): Spinner {
