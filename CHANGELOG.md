@@ -13,12 +13,14 @@ Perubahan penting proyek dicatat di sini.
 - Telemetry KGSL/GPU, devfreq, thermal zone, RAM/ZRAM, battery, storage,
   network, disk I/O, dan uptime.
 - Kontrol I/O scheduler berdasarkan pilihan yang diekspos oleh block device.
+- Kontrol VM swappiness dan VFS cache pressure dengan batas nilai dan rollback best-effort.
+- Kontrol TCP congestion control berdasarkan daftar algoritma yang diekspos kernel.
 - Tampilan dmesg terbaru untuk diagnosis (root diperlukan).
 - Unit tests untuk parser kernel.
 
 ### Changed
 - README dan architecture documentation diperbarui sesuai implementasi.
-- Project scope kini menandai monitoring, root bridge, CPU dan I/O controls aktif.
+- Project scope kini menandai monitoring, root bridge, CPU, I/O, VM dan TCP controls aktif.
 
 ### Safety
 - GPU, voltage, regulator, CPR/corner, DDR overclock, dan thermal protection
