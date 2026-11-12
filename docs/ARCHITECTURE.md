@@ -61,6 +61,7 @@ DeviceSnapshot contains a single sample for the UI. Nullable fields represent un
 | --- | --- | --- |
 | CPU topology | /sys/devices/system/cpu/present, cpu*/online | CPU0 protected; IDs 1–7 only; at least two online cores retained; read-back required |
 | CPU cpufreq | /sys/devices/system/cpu/cpufreq/policy*, legacy per-CPU cpufreq | Governor and min/max from live lists only |
+| Schedutil | policy*/schedutil/{hispeed_load,hispeed_freq,up_rate_limit_us,down_rate_limit_us,pl} | Only when policy governor is schedutil; bounded values, live OPP validation, read-back and rollback |
 | GPU | /sys/class/kgsl/kgsl-3d0/gpu_available_frequencies, max_pwrlevel, min_pwrlevel, num_pwrlevels | Maximum power-level selector using a live OPP only; thermal_pwrlevel is never written |
 | CCI / DDR | Matching /sys/class/devfreq/*/available_frequencies, min_freq, max_freq | Writes only when both bound nodes and selected live OPPs exist; path/name allowlist, ordered writes, read-back and rollback |
 | schedutil | /sys/devices/system/cpu/{policy}/schedutil/{hispeed_load,hispeed_freq,up_rate_limit_us,down_rate_limit_us} | Active schedutil policy only; range validation, live OPP validation for hispeed_freq, read-back and rollback |
@@ -73,6 +74,7 @@ DeviceSnapshot contains a single sample for the UI. Nullable fields represent un
 | I/O scheduler | /sys/block/{mmcblk[0-9]+, sd[a-c], nvme[0-9]+n[0-9]+}/queue/scheduler | Whole physical devices only; selected value must appear in the live node list |
 | VM | /proc/sys/vm/swappiness, /proc/sys/vm/vfs_cache_pressure | swappiness 0–100; cache pressure 10–200 |
 | TCP congestion | /proc/sys/net/ipv4/tcp_congestion_control | Selected algorithm must be in the live available list |
+| Dynamic Fsync | /sys/kernel/dyn_fsync/Dyn_fsync_active | Fixed-path 0/1 toggle with read-back and rollback; optional and risk-bearing |
 | Battery | Android battery sticky broadcast | Read-only |
 | Network | Android TrafficStats | Read-only |
 | Kernel log | dmesg | Read-only |
@@ -138,7 +140,7 @@ CPU hotplug accepts only present secondary cores 1–7; CPU0 cannot be disabled,
 
 Schedutil tunables are discovered only beneath a CPU policy currently using the schedutil governor. hispeed_load is limited to 0–100, hispeed_freq must be in that policy's live OPP list, rate limits are limited to 0–1,000,000 µs, and the power-limit flag is boolean. Dynamic Fsync is exposed only when /sys/kernel/dyn_fsync/Dyn_fsync_active is readable; only 0/1 is written and read-back is verified.
 
-The SDM450 source defines Adreno 506 OPPs in DTB data. This app can select only entries exposed by the running kernel. Regulator and CPR voltage data is read-only; no validated runtime undervolt write interface is provided. CPU hotplug is limited to secondary IDs 1–7, protects CPU0 and prevents taking the device below two online cores. CCI/DDR min/max controls appear only when both writable nodes and a matching live OPP table are exposed; otherwise they remain read-only.
+The SDM450 source defines Adreno 506 OPPs in DTB data. This app can select only entries exposed by the running kernel. Regulator and CPR voltage data is read-only; no validated runtime undervolt write interface is provided. Schedutil tunables are exposed only when the active governor is schedutil and the individual nodes exist; hispeed frequency must match the live CPU OPP table. Dynamic Fsync is an optional 0/1 control at a fixed sysfs path. Enabling it can defer fsync/fdatasync until screen-off; sudden power loss or a crash before the deferred writes complete can lose recent data or corrupt the filesystem. CPU hotplug is limited to secondary IDs 1–7, protects CPU0 and prevents taking the device below two online cores. CCI/DDR min/max controls appear only when both writable nodes and a matching live OPP table are exposed; otherwise they remain read-only.
 
 ## Safety limits
 
@@ -146,6 +148,7 @@ The SDM450 source defines Adreno 506 OPPs in DTB data. This app can select only 
 - No voltage overrides, regulator/CPR/corner or power-rail writes.
 - No DDR/RAM overclock or new devfreq OPP creation; CCI/DDR min/max changes are limited to existing live OPP entries.
 - No thermal trip-point or thermal-protection writes.
+- Dynamic Fsync is the only storage-write-policy toggle; it is opt-in and can trade durability for deferred synchronization.
 - No CPU0 hotplug; secondary CPU hotplug is restricted to IDs 1–7 and keeps at least two cores online.
 - No arbitrary shell command field in the UI.
 - Dynamic Fsync is optional and carries a data-integrity risk: deferred fsync/fdatasync writes may be lost if the device crashes or loses power while the screen is on.
