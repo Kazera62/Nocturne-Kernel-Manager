@@ -1,15 +1,24 @@
 # Changelog
 
-## [Unreleased]
+## [0.4.0] - 2026-11-12
 
-### Fixed
-- Apply dynamic status-bar, navigation-bar and display-cutout insets to the root layout.
-- Restrict I/O scheduler discovery, disk totals and scheduler writes to supported whole physical storage devices.
+### Added
+- Optional Advanced kernel menu, disabled by default and enabled from Settings.
+- KGSL GPU maximum-OPP selection using the running kernel's live gpu_available_frequencies table.
+- Regulator voltage, limits and state telemetry where the regulator sysfs nodes are readable.
+- Runtime GPU OPP-to-max_pwrlevel mapping tests.
 
 ### Changed
-- Keep sysfs/procfs reads, SU commands and SU session cleanup on a dedicated background I/O executor.
-- Coalesce telemetry updates to display frames and update visible values without rebuilding Overview, Performance, Monitor or System.
-- Shorten English and Indonesian UI descriptions and diagnostics.
+- Bump app version to 0.4.0 (versionCode 4).
+- Include regulator voltage and optional devfreq min/max values in device telemetry.
+- Keep CPU tuning within the live cpufreq OPP tables.
+- Keep all advanced controls behind live capability checks and root validation.
+
+### Safety
+- GPU control writes only KGSL max_pwrlevel; it does not add OPPs, change voltage, or modify thermal_pwrlevel.
+- CPU/GPU voltage and CPR remain read-only; no runtime undervolt interface is exposed.
+- CCI/DDR, regulator, thermal policy and DDR bandwidth controls remain read-only.
+- Higher GPU limits can increase heat and power and may cause artifacts, freezes, reboots or data loss.
 
 ## [0.3.0] - 2026-11-12
 
