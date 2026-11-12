@@ -73,6 +73,7 @@ class MainActivity : Activity() {
 
     private fun refresh(forceRender: Boolean = false) {
         if (!refreshInFlight.compareAndSet(false, true)) return
+        if (forceRender) repository.invalidateRootCache()
         worker.execute {
             val result = try {
                 repository.snapshot(applicationContext)
