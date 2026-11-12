@@ -30,6 +30,13 @@ object KernelParsers {
         return result.toList()
     }
 
+    /** KGSL power levels are indexed from highest to lowest frequency. */
+    fun gpuPowerLevelForFrequency(frequenciesHz: List<Long>, selectedFrequencyHz: Long): Int? =
+        frequenciesHz.sortedDescending().indexOf(selectedFrequencyHz).takeIf { it >= 0 }
+
+    fun gpuFrequencyForPowerLevel(frequenciesHz: List<Long>, powerLevel: Int): Long? =
+        frequenciesHz.sortedDescending().getOrNull(powerLevel)
+
     fun gpuUtilization(text: String?): Int? {
         val values = text.orEmpty().trim().split(Regex("\\s+"))
             .mapNotNull { it.toLongOrNull() }
