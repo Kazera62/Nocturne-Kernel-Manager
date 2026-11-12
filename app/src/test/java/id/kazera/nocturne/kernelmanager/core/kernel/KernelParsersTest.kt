@@ -22,6 +22,26 @@ class KernelParsersTest {
     }
 
     @Test
+    fun acceptsOnlySupportedSchedutilTunablesPaths() {
+        listOf(
+            "/sys/devices/system/cpu/cpufreq/policy0/schedutil",
+            "/sys/devices/system/cpu/cpufreq/policy12/schedutil",
+            "/sys/devices/system/cpu/cpu0/cpufreq/schedutil",
+            "/sys/devices/system/cpu/cpu7/cpufreq/schedutil",
+            "/sys/devices/system/cpu/cpufreq/schedutil"
+        ).forEach { assertEquals(true, KernelParsers.isSupportedSchedutilTunablesPath(it)) }
+
+        listOf(
+            "/sys/devices/system/cpu/cpufreq/policy0",
+            "/sys/devices/system/cpu/cpufreq/policy99/schedutil/../scaling_min_freq",
+            "/sys/devices/system/cpu/cpufreq/policy8/schedutil",
+            "/sys/devices/system/cpu/cpu8/cpufreq/schedutil",
+            "/sys/devices/system/cpu/cpufreq/interactive",
+            "/proc/sys/kernel/dyn_fsync/Dyn_fsync_active"
+        ).forEach { assertEquals(false, KernelParsers.isSupportedSchedutilTunablesPath(it)) }
+    }
+
+    @Test
     fun validatesSchedutilTunablesAgainstKnownBounds() {
         val frequencies = listOf(300_000L, 576_000L, 1_200_000L)
         assertEquals(true, KernelParsers.isValidSchedutilTunable("hispeed_load", 0, frequencies))
