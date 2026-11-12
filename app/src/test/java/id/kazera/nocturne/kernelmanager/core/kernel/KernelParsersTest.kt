@@ -112,7 +112,7 @@ class KernelParsersTest {
         assertEquals(true, KernelParsers.isAllowedKernelReadPath("/vendor/etc/fstab"))
         assertEquals(false, KernelParsers.isAllowedKernelReadPath("/data/local/tmp/file"))
         assertEquals(false, KernelParsers.isAllowedKernelReadPath("/sys/../data/local/tmp"))
-        assertEquals(false, KernelParsers.isAllowedKernelReadPath("/proc/version\\u0000suffix"))
+        assertEquals(false, KernelParsers.isAllowedKernelReadPath("/proc/version\u0000suffix"))
     }
 
     @Test
