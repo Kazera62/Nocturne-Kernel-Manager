@@ -44,8 +44,8 @@ Fokus pengembangan:
 
 ## Continuous integration
 
-GitHub Actions workflow **Android CI** runs automatically for pushes to
-`main` and pull requests targeting `main`. It can also be started manually
+GitHub Actions workflow **Android CI** runs automatically for every branch push and for pull requests targeting
+`main`. It can also be started manually
 from **Actions → Android CI → Run workflow** on `main`.
 
 The workflow runs unit tests, Android lint and a debug APK build. Keep
