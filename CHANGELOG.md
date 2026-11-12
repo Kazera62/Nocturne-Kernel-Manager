@@ -1,5 +1,16 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+- Apply dynamic status-bar, navigation-bar and display-cutout insets to the root layout.
+- Restrict I/O scheduler discovery and disk totals to supported whole physical storage devices.
+
+### Changed
+- Keep sysfs/procfs reads, SU commands and SU session cleanup on a dedicated background I/O executor.
+- Coalesce telemetry updates to display frames and update visible values without rebuilding the full Overview/Monitor view.
+- Shorten English and Indonesian UI descriptions and diagnostics.
+
 ## [0.3.0] - 2026-11-12
 
 ### Added
