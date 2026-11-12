@@ -258,8 +258,9 @@ class KernelRepository(
         selected: String
     ): ControlResult {
         if (!rootAccess().available) return ControlResult(false, "Root permission is required.")
-        if (!Regex("^/sys/block/[A-Za-z0-9_.-]+/queue/scheduler$").matches(scheduler.path)) {
-            return ControlResult(false, "Rejected unknown I/O scheduler path.")
+        if (!KernelParsers.isSupportedIoDevice(scheduler.deviceName) ||
+            scheduler.path != "/sys/block/${scheduler.deviceName}/queue/scheduler") {
+            return ControlResult(false, "Rejected unsupported physical I/O scheduler target.")
         }
         val liveSchedulers = KernelParsers.schedulerList(read(scheduler.path)).second
         if (liveSchedulers.isEmpty() || selected !in liveSchedulers) {
