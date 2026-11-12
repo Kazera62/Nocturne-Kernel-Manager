@@ -176,4 +176,6 @@ Run:
 ./gradlew testDebugUnitTest lintDebug assembleDebug
 ~~~
 
-GitHub Actions is manually triggered from main only.
+GitHub Actions runs Android verification for pushes to `main` and pull
+requests targeting `main`. A manual `workflow_dispatch` run is also available
+from `main`. The workflow executes unit tests, lint and `assembleDebug`.
