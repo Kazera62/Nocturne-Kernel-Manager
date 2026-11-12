@@ -32,7 +32,7 @@ data class ControlResult(
 
 /**
  * Reads only kernel interfaces present on the running device.
- * Writable operations are restricted to CPU cpufreq and block I/O scheduler nodes.
+ * Writable operations are restricted to validated CPU, I/O, VM and TCP controls.
  */
 class KernelRepository(
     private val rootShell: RootShell = RootShell()
@@ -84,7 +84,8 @@ class KernelRepository(
             model = model,
             deviceCode = deviceCode,
             platform = platform,
-            kernelVersion = System.getProperty("os.version").orEmpty().ifBlank { "Unknown" },
+            kernelVersion = read("/proc/sys/kernel/osrelease")
+                ?: System.getProperty("os.version").orEmpty().ifBlank { "Unknown" },
             uptimeSeconds = uptime,
             root = root,
             cpuPolicies = cpuPolicies,
@@ -118,18 +119,24 @@ class KernelRepository(
             minFrequencyKHz > maxFrequencyKHz) {
             return ControlResult(false, "Invalid CPU frequency range.")
         }
-        val frequencies = policy.availableFrequenciesKHz
-        if (frequencies.isEmpty() || minFrequencyKHz !in frequencies ||
-            maxFrequencyKHz !in frequencies) {
-            return ControlResult(false, "The selected frequencies are not in the kernel OPP table.")
-        }
-        if (governor != null && governor !in policy.availableGovernors) {
-            return ControlResult(false, "The selected governor is not supported by this policy.")
-        }
-
         val minPath = policy.path + "/scaling_min_freq"
         val maxPath = policy.path + "/scaling_max_freq"
         val governorPath = policy.path + "/scaling_governor"
+
+        // Re-read live capability lists; never trust a stale UI snapshot for a write.
+        val liveFrequencies = KernelParsers.frequencyList(
+            read(policy.path + "/scaling_available_frequencies")
+                ?: read(policy.path + "/cpuinfo_available_frequencies")
+        )
+        if (liveFrequencies.isEmpty() || minFrequencyKHz !in liveFrequencies ||
+            maxFrequencyKHz !in liveFrequencies) {
+            return ControlResult(false, "Selected frequencies are no longer in the live kernel OPP table.")
+        }
+        val liveGovernors = read(policy.path + "/scaling_available_governors")
+            .orEmpty().split(Regex("\\s+")).filter { it.isNotBlank() }
+        if (governor != null && governor !in liveGovernors) {
+            return ControlResult(false, "The selected governor is no longer supported by this policy.")
+        }
         val oldMin = read(minPath)?.toLongOrNull()
         val oldMax = read(maxPath)?.toLongOrNull()
         val oldGovernor = read(governorPath)
@@ -174,6 +181,15 @@ class KernelRepository(
         if (!second.success) {
             rollback()
             return ControlResult(false, second.error ?: "CPU limit update failed; previous values were restored where possible.")
+        }
+
+        val verifiedMin = read(minPath)?.toLongOrNull()
+        val verifiedMax = read(maxPath)?.toLongOrNull()
+        val verifiedGovernor = if (governor != null) read(governorPath) else null
+        if (verifiedMin != minFrequencyKHz || verifiedMax != maxFrequencyKHz ||
+            (governor != null && verifiedGovernor != governor)) {
+            rollback()
+            return ControlResult(false, "Kernel read-back did not match the requested CPU policy; previous values were restored where possible.")
         }
 
         return ControlResult(true, "CPU policy updated. Values are not guaranteed to persist after reboot.")
@@ -224,8 +240,12 @@ class KernelRepository(
         selected: String
     ): ControlResult {
         if (!rootAccess().available) return ControlResult(false, "Root permission is required.")
-        if (selected !in scheduler.availableSchedulers) {
-            return ControlResult(false, "The selected I/O scheduler is not exposed by this device.")
+        if (!Regex("^/sys/block/[A-Za-z0-9_.-]+/queue/scheduler$").matches(scheduler.path)) {
+            return ControlResult(false, "Rejected unknown I/O scheduler path.")
+        }
+        val liveSchedulers = KernelParsers.schedulerList(read(scheduler.path)).second
+        if (liveSchedulers.isEmpty() || selected !in liveSchedulers) {
+            return ControlResult(false, "The selected I/O scheduler is not exposed by the live kernel node.")
         }
         val result = rootShell.writeIoScheduler(scheduler.path, selected)
         return if (result.success) {
@@ -388,7 +408,10 @@ class KernelRepository(
     }
 
     private fun discoverIoSchedulers(): List<IoSchedulerInfo> {
-        val blockDevices = File("/sys/block").listFiles()?.filter { it.isDirectory }.orEmpty()
+        val blockDevices = discoverDirectories(
+            "/sys/block",
+            Regex("[A-Za-z0-9_.!:+-]+")
+        )
         return blockDevices.mapNotNull { device ->
             val path = device.absolutePath + "/queue/scheduler"
             val content = read(path) ?: return@mapNotNull null
@@ -448,7 +471,7 @@ class KernelRepository(
             val stats = StatFs(Environment.getDataDirectory().absolutePath)
             StorageInfo(stats.totalBytes, stats.availableBytes)
         } catch (_: Exception) {
-            StorageInfo(0L, 0L)
+            StorageInfo(null, null)
         }
     }
 
@@ -461,7 +484,8 @@ class KernelRepository(
             val parts = line.trim().split(Regex("\\s+"))
             if (parts.size >= 10) {
                 val device = parts[2]
-                if (!device.startsWith("loop") && !device.startsWith("ram")) {
+                val isPartition = File("/sys/class/block/$device/partition").exists()
+                if (!device.startsWith("loop") && !device.startsWith("ram") && !isPartition) {
                     sectorsRead += parts[5].toLongOrNull() ?: 0L
                     sectorsWritten += parts[9].toLongOrNull() ?: 0L
                     hasData = true
