@@ -737,7 +737,7 @@ class HomeScreen(
                             actionButton("Apply hispeed load", "Apply schedutil hispeed load") {
                                 if (!data.root.available) toast("Root permission is required.")
                                 else onSchedutilTunableApply(
-                                    item.policyPath,
+                                    item.path,
                                     "hispeed_load",
                                     ((loadBar.tag as Int) + loadBar.progress).toString()
                                 )
@@ -754,14 +754,14 @@ class HomeScreen(
                             actionButton("Apply hispeed frequency", "Apply schedutil hispeed frequency") {
                                 if (!data.root.available) toast("Root permission is required.")
                                 else selectedFrequency(picker)?.let { selected ->
-                                    onSchedutilTunableApply(item.policyPath, "hispeed_freq", selected.toString())
+                                    onSchedutilTunableApply(item.path, "hispeed_freq", selected.toString())
                                 }
                             },
                             LayoutParams(MATCH_PARENT, dp(42)).apply { topMargin = dp(4) }
                         )
                     }
                     item.upRateLimitUs?.takeIf { it in 0L..1_000_000L }?.let { current ->
-                        addSchedutilRateControl(card, item.policyPath, "up_rate_limit_us", "Up rate limit", current, data.root.available)
+                        addSchedutilRateControl(card, item.path, "up_rate_limit_us", "Up rate limit", current, data.root.available)
                     }
                     item.downRateLimitUs?.takeIf { it in 0L..1_000_000L }?.let { current ->
                         addSchedutilRateControl(card, item.policyPath, "down_rate_limit_us", "Down rate limit", current, data.root.available)
@@ -1409,7 +1409,7 @@ class HomeScreen(
 
     private fun addSchedutilRateControl(
         parent: LinearLayout,
-        policyPath: String,
+        tunablesPath: String,
         tunable: String,
         label: String,
         current: Long,
@@ -1440,7 +1440,7 @@ class HomeScreen(
                         ?.toLongOrNull()
                         ?.takeIf { it in 0L..1_000_000L }
                         ?.let { value ->
-                            onSchedutilTunableApply(policyPath, tunable, value.toString())
+                            onSchedutilTunableApply(tunablesPath, tunable, value.toString())
                         }
                 }
             },
