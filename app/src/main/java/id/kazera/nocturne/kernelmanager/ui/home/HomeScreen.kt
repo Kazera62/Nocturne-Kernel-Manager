@@ -782,7 +782,7 @@ class HomeScreen(
     }
 
     private fun addUnsupported(parent: LinearLayout, label: String) {
-        addText(parent, label + " · Unsupported", MUTED, 12f, top = 5)
+        addText(parent, t(label) + " · " + t("Unsupported"), MUTED, 12f, top = 5)
     }
 
     private fun addProgress(parent: LinearLayout, value: Int) {
