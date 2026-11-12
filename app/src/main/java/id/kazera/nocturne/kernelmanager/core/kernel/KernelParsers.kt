@@ -37,6 +37,11 @@ object KernelParsers {
     fun gpuFrequencyForPowerLevel(frequenciesHz: List<Long>, powerLevel: Int): Long? =
         frequenciesHz.sortedDescending().getOrNull(powerLevel)
 
+    fun isSupportedSchedutilTunablesPath(path: String): Boolean =
+        Regex(
+            "^/sys/devices/system/cpu/(cpufreq/policy[0-9]+/schedutil|cpu[0-7]/cpufreq/schedutil|cpufreq/schedutil)$"
+        ).matches(path)
+
     fun isValidSchedutilTunable(
         tunable: String,
         value: Long,
