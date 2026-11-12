@@ -22,7 +22,7 @@ Target M11/A11 adalah fokus pengembangan. Seluruh varian regional, firmware, ROM
 | Memory | RAM, ZRAM statistics, swappiness, VFS cache pressure |
 | Kernel extras | ZRAM compression algorithm, KSM status/statistics, entropy readings |
 | Thermal | Detected thermal-zone temperatures |
-| I/O | Disk statistics and per-device scheduler |
+| I/O | Disk statistics; scheduler controls for whole-device `mmcblk*`, `sda`–`sdc` and `nvme*` only |
 | Network | RX/TX counters and kernel-supported TCP congestion algorithms |
 | System | Battery, storage, uptime, kernel release and dmesg |
 | Settings | English / Bahasa Indonesia and configurable refresh interval |
@@ -37,6 +37,8 @@ The navigation is divided into four main areas:
 - **System** — battery, storage, network, TCP congestion and kernel logs.
 
 The gear icon in the top-right opens **Settings**. Language and refresh preferences are stored locally.
+
+The layout applies dynamic status-bar, navigation-bar and display-cutout insets. Kernel telemetry and all SU commands run on a dedicated background I/O executor. Overview and Monitor update bound values on the next display frame rather than rebuilding the full view tree on every poll.
 
 ## Root startup flow
 
