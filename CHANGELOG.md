@@ -8,7 +8,7 @@
 
 ### Changed
 - Keep sysfs/procfs reads, SU commands and SU session cleanup on a dedicated background I/O executor.
-- Coalesce telemetry updates to display frames and update visible values without rebuilding the full Overview/Monitor view.
+- Coalesce telemetry updates to display frames and update visible values without rebuilding Overview, Performance, Monitor or System.
 - Shorten English and Indonesian UI descriptions and diagnostics.
 
 ## [0.3.0] - 2026-11-12
