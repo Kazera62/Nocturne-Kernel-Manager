@@ -80,6 +80,9 @@ class MainActivity : Activity() {
                 UiPreferences.setRefreshIntervalSeconds(this, seconds)
                 refreshIntervalMs = seconds * 1_000L
                 if (activityResumed && rootInitialized) startRefreshLoop()
+            },
+            onGpuMaximumFrequencyApply = { frequencyHz ->
+                applyGpuMaximumFrequency(frequencyHz)
             }
         )
         setContentView(screen)
@@ -229,6 +232,16 @@ class MainActivity : Activity() {
     private fun applyIoScheduler(scheduler: IoSchedulerInfo, selected: String) {
         ioExecutor.execute {
             val result = repository.applyIoScheduler(scheduler, selected)
+            runOnUiThread {
+                Toast.makeText(this, UiText.translate(this, result.message), Toast.LENGTH_LONG).show()
+                refresh(forceRender = true)
+            }
+        }
+    }
+
+    private fun applyGpuMaximumFrequency(frequencyHz: Long) {
+        ioExecutor.execute {
+            val result = repository.applyGpuMaximumFrequency(frequencyHz)
             runOnUiThread {
                 Toast.makeText(this, UiText.translate(this, result.message), Toast.LENGTH_LONG).show()
                 refresh(forceRender = true)
