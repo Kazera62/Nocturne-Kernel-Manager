@@ -105,4 +105,41 @@ class KernelParsersTest {
         assertEquals("mq-deadline", result.first)
         assertEquals(listOf("none", "mq-deadline", "bfq"), result.second)
     }
+    @Test
+    fun allowsOnlyKernelReadRootsAndRejectsTraversal() {
+        assertEquals(true, KernelParsers.isAllowedKernelReadPath("/sys/devices/system/cpu/online"))
+        assertEquals(true, KernelParsers.isAllowedKernelReadPath("/proc/meminfo"))
+        assertEquals(true, KernelParsers.isAllowedKernelReadPath("/vendor/etc/fstab"))
+        assertEquals(false, KernelParsers.isAllowedKernelReadPath("/data/local/tmp/file"))
+        assertEquals(false, KernelParsers.isAllowedKernelReadPath("/sys/../data/local/tmp"))
+        assertEquals(false, KernelParsers.isAllowedKernelReadPath("/proc/version\\u0000suffix"))
+    }
+
+    @Test
+    fun acceptsOnlyDirectDevfreqClassNodes() {
+        assertEquals(true, KernelParsers.isSupportedDevfreqPath("/sys/class/devfreq/soc:qcom,cpubw-cpufreq"))
+        assertEquals(true, KernelParsers.isSupportedDevfreqPath("/sys/class/devfreq/cci"))
+        assertEquals(false, KernelParsers.isSupportedDevfreqPath("/sys/class/devfreq/../cpubw"))
+        assertEquals(false, KernelParsers.isSupportedDevfreqPath("/sys/class/devfreq/cci/min_freq"))
+        assertEquals(false, KernelParsers.isSupportedDevfreqPath("/proc/sys/devfreq/cci"))
+    }
+
+    @Test
+    fun acceptsOnlyKnownFabricDevfreqNames() {
+        assertEquals(true, KernelParsers.isSupportedDevfreqName("qcom,cci"))
+        assertEquals(true, KernelParsers.isSupportedDevfreqName("cpubw-cpufreq"))
+        assertEquals(true, KernelParsers.isSupportedDevfreqName("soc-ddr"))
+        assertEquals(false, KernelParsers.isSupportedDevfreqName("kgsl-3d0"))
+        assertEquals(false, KernelParsers.isSupportedDevfreqName("unknown-device"))
+    }
+
+    @Test
+    fun keepsAtLeastTwoCoresOnlineWhenDisablingSecondaryCores() {
+        assertEquals(true, KernelParsers.canChangeCpuOnline(1, false, 3))
+        assertEquals(false, KernelParsers.canChangeCpuOnline(1, false, 2))
+        assertEquals(true, KernelParsers.canChangeCpuOnline(1, true, 1))
+        assertEquals(false, KernelParsers.canChangeCpuOnline(0, false, 4))
+        assertEquals(false, KernelParsers.canChangeCpuOnline(8, true, 4))
+    }
+
 }
