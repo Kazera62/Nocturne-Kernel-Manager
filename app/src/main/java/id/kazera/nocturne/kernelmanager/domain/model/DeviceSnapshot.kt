@@ -60,8 +60,8 @@ data class BatteryInfo(
 )
 
 data class StorageInfo(
-    val totalBytes: Long,
-    val availableBytes: Long
+    val totalBytes: Long?,
+    val availableBytes: Long?
 )
 
 data class IoUsage(
