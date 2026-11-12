@@ -109,6 +109,7 @@ The main navigation contains:
 - Performance
 - Monitor
 - System
+- Advanced (only when enabled in Settings)
 
 The Settings page is opened from the gear icon in the upper-right header. It manages language (en / id), refresh interval, root diagnostics and a default-off Advanced menu toggle. Enabling it adds an Advanced navigation page.
 
@@ -122,7 +123,7 @@ Overview, Performance, Monitor and System use bound TextViews for changing telem
 
 The archived SmartPack Kernel Manager repository was reviewed for its capability-driven feature organization and kernel-manager concepts. The implementation in this repository was written independently; no SmartPack source file was copied.
 
-Read-only features inspired by that review include CPU core online topology, ZRAM algorithm discovery, KSM telemetry and entropy readings. CPU hotplug write controls, profiles and apply-on-boot are not part of this release.
+Read-only features inspired by that review include CPU core online topology, ZRAM algorithm discovery, KSM telemetry and entropy readings. This release also has guarded CPU hotplug in Advanced (CPU0 protected, IDs 1–7, minimum two online cores). Profiles and apply-on-boot are not part of this release.
 
 Reference: https://github.com/SmartPack/SmartPack-Kernel-Manager
 The reference repository is archived and declares GPL-3.0.
@@ -133,7 +134,7 @@ The Advanced menu is default-off. Its GPU control maps a selected frequency to t
 
 CPU hotplug accepts only present secondary cores 1–7; CPU0 cannot be disabled, and the repository rejects a change that would leave fewer than two cores online. CCI/DDR limits are exposed only when available_frequencies, min_freq and max_freq are all readable and the requested bounds exist in the live table. Writes are serialized, ordered to avoid invalid transient ranges, verified and rolled back best-effort.
 
-The SDM450 source defines Adreno 506 OPPs in DTB data. This app can select only entries exposed by the running kernel. Regulator and CPR voltage data is read-only; no validated runtime undervolt write interface is provided. CCI/DDR limits are also read-only in this release because a generic write interface was not established for this kernel.
+The SDM450 source defines Adreno 506 OPPs in DTB data. This app can select only entries exposed by the running kernel. Regulator and CPR voltage data is read-only; no validated runtime undervolt write interface is provided. CPU hotplug is limited to secondary IDs 1–7, protects CPU0 and prevents taking the device below two online cores. CCI/DDR min/max controls appear only when both writable nodes and a matching live OPP table are exposed; otherwise they remain read-only.
 
 ## Safety limits
 
