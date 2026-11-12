@@ -61,7 +61,7 @@ DeviceSnapshot contains a single sample for the UI. Nullable fields represent un
 | --- | --- | --- |
 | CPU topology | /sys/devices/system/cpu/present, cpu*/online | CPU0 protected; IDs 1–7 only; at least two online cores retained; read-back required |
 | CPU cpufreq | /sys/devices/system/cpu/cpufreq/policy*, legacy per-CPU cpufreq | Governor and min/max from live lists only |
-| Schedutil | policy*/schedutil/{hispeed_load,hispeed_freq,up_rate_limit_us,down_rate_limit_us,pl} | Only when policy governor is schedutil; bounded values, live OPP validation, read-back and rollback |
+| Schedutil | /sys/devices/system/cpu/{cpufreq/policy*/schedutil,cpu*/cpufreq/schedutil,cpufreq/schedutil}/ | Per-policy or global path discovered from live nodes; bounded values, common OPP validation for global hispeed_freq, read-back and rollback |
 | GPU | /sys/class/kgsl/kgsl-3d0/gpu_available_frequencies, max_pwrlevel, min_pwrlevel, num_pwrlevels | Maximum power-level selector using a live OPP only; thermal_pwrlevel is never written |
 | CCI / DDR | Matching /sys/class/devfreq/*/available_frequencies, min_freq, max_freq | Writes only when both bound nodes and selected live OPPs exist; path/name allowlist, ordered writes, read-back and rollback |
 | Regulator | /sys/class/regulator/regulator*/ | Voltage/range/state telemetry only |
@@ -136,7 +136,7 @@ The Advanced menu is default-off. Its GPU control maps a selected frequency to t
 
 CPU hotplug accepts only present secondary cores 1–7; CPU0 cannot be disabled, and the repository rejects a change that would leave fewer than two cores online. CCI/DDR limits are exposed only when available_frequencies, min_freq and max_freq are all readable and the requested bounds exist in the live table. Writes are serialized, ordered to avoid invalid transient ranges, verified and rolled back best-effort.
 
-Schedutil tunables are discovered only beneath a CPU policy currently using the schedutil governor. hispeed_load is limited to 0–100, hispeed_freq must be in that policy's live OPP list, rate limits are limited to 0–1,000,000 µs, and the power-limit flag is boolean. Dynamic Fsync is exposed only when /sys/kernel/dyn_fsync/Dyn_fsync_active is readable; only 0/1 is written and read-back is verified.
+Schedutil tunables are discovered only when at least one CPU policy currently uses the schedutil governor. Both per-policy and global tunable directories are scanned and deduplicated by canonical path. hispeed_load is limited to 0–100, hispeed_freq must be in that policy's live OPP list, rate limits are limited to 0–1,000,000 µs, and the power-limit flag is boolean. Dynamic Fsync is exposed only when /sys/kernel/dyn_fsync/Dyn_fsync_active is readable; only 0/1 is written and read-back is verified.
 
 The SDM450 source defines Adreno 506 OPPs in DTB data. This app can select only entries exposed by the running kernel. Regulator/CPR voltage remains read-only; no runtime undervolt interface is exposed. KonaBess changes boot-image DTB data and its published device list does not include SDM450, so its generated output is not suitable for M11/A11.
 
