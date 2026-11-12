@@ -694,9 +694,14 @@ class HomeScreen(
 
     private fun renderIo(container: LinearLayout, data: DeviceSnapshot) {
         addPageHeading(container, "I/O scheduler", "Available schedulers per device.")
-        val readSectors = data.ioUsage.sectorsRead?.toString() ?: "Unsupported"
-        val writtenSectors = data.ioUsage.sectorsWritten?.toString() ?: "Unsupported"
-        addInfoCard(container, "Cumulative disk sectors", "Read: " + readSectors + " · Written: " + writtenSectors)
+        addCard(container, "Cumulative disk sectors") { card ->
+            addLiveInfoRow(card, "Read sectors", data.ioUsage.sectorsRead?.toString() ?: "Unsupported") {
+                it.ioUsage.sectorsRead?.toString() ?: "Unsupported"
+            }
+            addLiveInfoRow(card, "Written sectors", data.ioUsage.sectorsWritten?.toString() ?: "Unsupported") {
+                it.ioUsage.sectorsWritten?.toString() ?: "Unsupported"
+            }
+        }
         if (!data.root.available) addRootRequired(container)
 
         if (data.ioSchedulers.isEmpty()) {
@@ -706,8 +711,13 @@ class HomeScreen(
         } else {
             data.ioSchedulers.forEach { scheduler ->
                 addCard(container, scheduler.deviceName, scheduler.path) { card ->
-                    addInfoRow(card, "Active scheduler", scheduler.activeScheduler ?: "Unknown")
-                    addInfoRow(card, "Available", scheduler.availableSchedulers.joinToString(", "))
+                    addLiveInfoRow(card, "Active scheduler", scheduler.activeScheduler ?: "Unknown") { current ->
+                        current.ioSchedulers.firstOrNull { it.path == scheduler.path }?.activeScheduler ?: "Unknown"
+                    }
+                    addLiveInfoRow(card, "Available", scheduler.availableSchedulers.joinToString(", ")) { current ->
+                        current.ioSchedulers.firstOrNull { it.path == scheduler.path }
+                            ?.availableSchedulers?.joinToString(", ") ?: "Unsupported"
+                    }
                     val schedulerOptions = if (scheduler.activeScheduler != null &&
                         scheduler.activeScheduler in scheduler.availableSchedulers) {
                         scheduler.availableSchedulers
@@ -733,34 +743,66 @@ class HomeScreen(
     private fun renderSystem(container: LinearLayout, data: DeviceSnapshot) {
         addPageHeading(container, "System & diagnostics", "Battery, storage, network and dmesg.")
         addCard(container, "BATTERY") {
-            addInfoRow(it, "Level", data.battery.levelPercent?.let { value -> "$value%" } ?: "Unsupported")
-            addInfoRow(it, "State", when (data.battery.charging) {
+            addLiveInfoRow(it, "Level", data.battery.levelPercent?.let { value -> "$value%" } ?: "Unsupported") { current ->
+                current.battery.levelPercent?.let { value -> "$value%" } ?: "Unsupported"
+            }
+            addLiveInfoRow(it, "State", when (data.battery.charging) {
                 true -> "Charging / full"
                 false -> "Not charging"
                 null -> "Unsupported"
-            })
-            addInfoRow(it, "Temperature", data.battery.temperatureCelsius?.let { value ->
+            }) { current ->
+                when (current.battery.charging) {
+                    true -> "Charging / full"
+                    false -> "Not charging"
+                    null -> "Unsupported"
+                }
+            }
+            addLiveInfoRow(it, "Temperature", data.battery.temperatureCelsius?.let { value ->
                 String.format(Locale.US, "%.1f °C", value)
-            } ?: "Unsupported")
-            addInfoRow(it, "Voltage", data.battery.voltageMillivolts?.let { value -> "$value mV" } ?: "Unsupported")
-            addInfoRow(it, "Technology", data.battery.technology ?: "Unsupported")
+            } ?: "Unsupported") { current ->
+                current.battery.temperatureCelsius?.let { value ->
+                    String.format(Locale.US, "%.1f °C", value)
+                } ?: "Unsupported"
+            }
+            addLiveInfoRow(it, "Voltage", data.battery.voltageMillivolts?.let { value -> "$value mV" } ?: "Unsupported") { current ->
+                current.battery.voltageMillivolts?.let { value -> "$value mV" } ?: "Unsupported"
+            }
+            addLiveInfoRow(it, "Technology", data.battery.technology ?: "Unsupported") {
+                it.battery.technology ?: "Unsupported"
+            }
         }
         addCard(container, "STORAGE") {
-            addInfoRow(it, "Data partition total", DeviceInfo.bytes(data.storage.totalBytes))
-            addInfoRow(it, "Available", DeviceInfo.bytes(data.storage.availableBytes))
+            addLiveInfoRow(it, "Data partition total", DeviceInfo.bytes(data.storage.totalBytes)) {
+                DeviceInfo.bytes(it.storage.totalBytes)
+            }
+            addLiveInfoRow(it, "Available", DeviceInfo.bytes(data.storage.availableBytes)) {
+                DeviceInfo.bytes(it.storage.availableBytes)
+            }
             val totalBytes = data.storage.totalBytes
             val availableBytes = data.storage.availableBytes
             val percent = if (totalBytes != null && availableBytes != null && totalBytes > 0L) {
                 ((availableBytes * 100L) / totalBytes).toInt().coerceIn(0, 100)
             } else null
-            addInfoRow(it, "Available space", percent?.let { value -> "$value%" } ?: "Unsupported")
+            addLiveInfoRow(it, "Available space", percent?.let { value -> "$value%" } ?: "Unsupported") { current ->
+                val total = current.storage.totalBytes
+                val free = current.storage.availableBytes
+                if (total != null && free != null && total > 0L) {
+                    (((free * 100L) / total).toInt().coerceIn(0, 100)).toString() + "%"
+                } else "Unsupported"
+            }
         }
         addCard(container, "NETWORK") {
-            addInfoRow(it, "Total RX", DeviceInfo.bytes(data.networkRxBytes))
-            addInfoRow(it, "Total TX", DeviceInfo.bytes(data.networkTxBytes))
+            addLiveInfoRow(it, "Total RX", DeviceInfo.bytes(data.networkRxBytes)) {
+                DeviceInfo.bytes(it.networkRxBytes)
+            }
+            addLiveInfoRow(it, "Total TX", DeviceInfo.bytes(data.networkTxBytes)) {
+                DeviceInfo.bytes(it.networkTxBytes)
+            }
             addText(it, "TrafficStats totals since counter reset.", MUTED, 11f, top = 7)
             addText(it, "TCP congestion control", SECONDARY, 12f, bold = true, top = 12)
-            addInfoRow(it, "Current algorithm", data.tcpCongestionControl ?: "Unsupported")
+            addLiveInfoRow(it, "Current algorithm", data.tcpCongestionControl ?: "Unsupported") {
+                it.tcpCongestionControl ?: "Unsupported"
+            }
             if (data.availableTcpCongestionControls.isNotEmpty()) {
                 val tcpOptions = if (data.tcpCongestionControl != null &&
                     data.tcpCongestionControl in data.availableTcpCongestionControls) {
@@ -788,7 +830,9 @@ class HomeScreen(
             addInfoRow(it, "Kernel release", data.kernelVersion)
             addInfoRow(it, "Device", data.deviceCode)
             addInfoRow(it, "Platform", data.platform)
-            addInfoRow(it, "Uptime", DeviceInfo.uptime(data.uptimeSeconds))
+            addLiveInfoRow(it, "Uptime", DeviceInfo.uptime(data.uptimeSeconds)) {
+                DeviceInfo.uptime(it.uptimeSeconds)
+            }
         }
     }
 
