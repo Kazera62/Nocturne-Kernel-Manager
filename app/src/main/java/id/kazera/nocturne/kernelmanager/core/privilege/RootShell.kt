@@ -59,7 +59,7 @@ class RootShell {
 
     fun writeCpuNode(path: String, value: String): ShellResult {
         val allowedPath = Regex(
-            "^/sys/devices/system/cpu/cpufreq/policy[0-9]+/scaling_(min_freq|max_freq|governor)$"
+            "^/sys/devices/system/cpu/(cpufreq/policy[0-9]+|cpu[0-7]/cpufreq)/scaling_(min_freq|max_freq|governor)$"
         ).matches(path)
         if (!allowedPath || !Regex("^[A-Za-z0-9_.-]{1,40}$").matches(value)) {
             return ShellResult(false, "", -1, "Rejected invalid CPU control target or value")
