@@ -83,6 +83,12 @@ class MainActivity : Activity() {
             },
             onGpuMaximumFrequencyApply = { frequencyHz ->
                 applyGpuMaximumFrequency(frequencyHz)
+            },
+            onCpuCoreToggle = { coreId, online ->
+                applyCpuCoreOnline(coreId, online)
+            },
+            onDevfreqRangeApply = { path, minimum, maximum ->
+                applyDevfreqLimits(path, minimum, maximum)
             }
         )
         setContentView(screen)
@@ -242,6 +248,26 @@ class MainActivity : Activity() {
     private fun applyGpuMaximumFrequency(frequencyHz: Long) {
         ioExecutor.execute {
             val result = repository.applyGpuMaximumFrequency(frequencyHz)
+            runOnUiThread {
+                Toast.makeText(this, UiText.translate(this, result.message), Toast.LENGTH_LONG).show()
+                refresh(forceRender = true)
+            }
+        }
+    }
+
+    private fun applyCpuCoreOnline(coreId: Int, online: Boolean) {
+        ioExecutor.execute {
+            val result = repository.applyCpuCoreOnline(coreId, online)
+            runOnUiThread {
+                Toast.makeText(this, UiText.translate(this, result.message), Toast.LENGTH_LONG).show()
+                refresh(forceRender = true)
+            }
+        }
+    }
+
+    private fun applyDevfreqLimits(path: String, minimumHz: Long, maximumHz: Long) {
+        ioExecutor.execute {
+            val result = repository.applyDevfreqLimits(path, minimumHz, maximumHz)
             runOnUiThread {
                 Toast.makeText(this, UiText.translate(this, result.message), Toast.LENGTH_LONG).show()
                 refresh(forceRender = true)
