@@ -1,23 +1,32 @@
 # Contributing
 
-Terima kasih telah membantu mengembangkan Nocturne Kernel Manager.
+Panduan ini berlaku untuk pengembangan Nocturne Kernel Manager, aplikasi Android
+yang menargetkan Samsung Galaxy M11 (SM-M115 series) dan Galaxy A11
+(SM-A115 series).
 
-## Tahap proyek
+## Fokus tahap sekarang
 
-Repository saat ini sedang membangun fondasi aplikasi Android. Pertahankan perubahan tetap berfokus pada struktur proyek, keandalan build, dokumentasi, dan kualitas kode sampai ruang lingkup implementasi berikutnya ditentukan secara terpisah.
+Repository berada pada tahap **application foundation**. Perubahan saat ini
+harus berfokus pada:
+- struktur dan konfigurasi proyek Android;
+- stabilitas build dan kualitas kode;
+- UI dasar dan resource aplikasi;
+- dokumentasi dan pengujian fondasi.
 
-Jangan menambahkan perintah kernel, eksekusi root, akses sysfs, tuning perangkat, atau background service sebagai perubahan sampingan pada tahap fondasi.
+Jangan memasukkan integrasi root, perintah kernel, akses sysfs/procfs, tuning
+perangkat, pemantauan hardware, atau background service sebagai perubahan
+sampingan pada tahap ini.
 
 ## Lingkungan pengembangan
 
 - JDK 17
 - Android SDK Platform 36
 - Android SDK Build Tools 36.0.0
-- Android Studio yang mendukung AGP 9.4.0
+- Android Studio yang mendukung Android Gradle Plugin 9.4.0
 
-## Build dan pemeriksaan
+## Build dan verifikasi lokal
 
-Jalankan perintah berikut sebelum membuka pull request:
+Jalankan dari root repository:
 
 ```bash
 ./gradlew testDebugUnitTest
@@ -25,24 +34,35 @@ Jalankan perintah berikut sebelum membuka pull request:
 ./gradlew assembleDebug
 ```
 
-## Pull request
+## Menjalankan CI
 
-Setiap pull request sebaiknya:
-- Menjelaskan tujuan dan batas perubahan.
-- Tidak mencampurkan refactor yang tidak berkaitan.
-- Menyertakan screenshot untuk perubahan UI jika relevan.
-- Memastikan task Gradle yang terkait berhasil.
-- Menyebutkan asumsi kompatibilitas perangkat yang belum diverifikasi.
+Workflow GitHub Actions bernama **Android CI** berjalan manual, bukan otomatis
+saat push atau pull request.
+
+1. Buka tab **Actions**.
+2. Pilih **Android CI**.
+3. Tekan **Run workflow**.
+4. Pilih branch `main` untuk memverifikasi kondisi utama repository.
+
+## Standar perubahan
+
+- Satu perubahan harus memiliki tujuan yang jelas.
+- Hindari mencampur refactor yang tidak berkaitan.
+- Perbarui README atau dokumen arsitektur jika struktur berubah.
+- Sertakan screenshot untuk perubahan UI yang terlihat.
+- Jangan menyatakan perangkat telah diuji jika pengujian fisik tidak dilakukan.
+- Jangan mengklaim dukungan semua model, firmware, ROM, atau kernel tanpa
+  validasi.
 
 ## Format commit
 
-Gunakan prefix singkat dan imperatif:
+Gunakan prefix singkat dan deskriptif:
 
-- `chore:` pemeliharaan proyek atau tooling
-- `build:` perubahan Gradle atau build system
-- `ci:` otomatisasi
+- `build:` konfigurasi Gradle atau build system
+- `ci:` GitHub Actions
 - `docs:` dokumentasi
 - `feat:` fungsi aplikasi
-- `fix:` perbaikan masalah
+- `fix:` perbaikan
 - `refactor:` perubahan struktur tanpa perubahan perilaku
-- `test:` penambahan atau perbaikan pengujian
+- `test:` pengujian
+- `chore:` pemeliharaan proyek

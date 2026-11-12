@@ -1,9 +1,8 @@
 name: Android CI
 
+run-name: Android CI · ${{ github.ref_name }} · @${{ github.actor }}
+
 on:
-  push:
-    branches:
-      - main
   workflow_dispatch:
 
 permissions:

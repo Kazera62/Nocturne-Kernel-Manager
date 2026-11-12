@@ -2,15 +2,19 @@
 
 Perubahan penting proyek dicatat di sini.
 
-## [0.1.0] - Initial foundation
+## [0.1.1] - Foundation structure refinement
 
 ### Added
-- Fondasi proyek aplikasi Android untuk Samsung Galaxy M11 dan Galaxy A11.
-- Entry point aplikasi Kotlin dan halaman awal minimal.
-- Android manifest, theme, colors, strings, dan vector launcher icon.
-- Konfigurasi Gradle dan Gradle Wrapper yang dipin.
-- GitHub Actions untuk build Android, unit-test task, dan lint.
-- README, panduan kontribusi, dan panduan pelaporan keamanan.
+- Pemisahan tampilan awal ke package `ui/home`.
+- Metadata target dan pembatasan ruang lingkup pada `core/project`.
+- Unit test untuk menjaga batas tahap fondasi.
+- Dokumentasi arsitektur melalui `docs/ARCHITECTURE.md`.
+
+### Changed
+- README diperbarui agar sesuai dengan isi repository saat ini.
+- Panduan kontribusi disesuaikan dengan CI manual.
+- GitHub Actions hanya berjalan melalui pemicu manual (`workflow_dispatch`).
 
 ### Scope
-- Belum ada akses kernel, integrasi root, tuning perangkat, monitoring, atau fitur pengelolaan operasional.
+- Belum ada integrasi root, pengelolaan kernel, monitoring, tuning, atau service
+  latar belakang.
