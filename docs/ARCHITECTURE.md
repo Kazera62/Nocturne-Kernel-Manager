@@ -67,7 +67,7 @@ DeviceSnapshot contains a single sample for the UI. Nullable fields represent un
 | Memory / ZRAM | /proc/meminfo, /sys/block/zram0/ | Read-only |
 | KSM | /sys/kernel/mm/ksm/ | Read-only |
 | Entropy | /proc/sys/kernel/random/ | Read-only |
-| I/O scheduler | /sys/block/*/queue/scheduler | Selected value must appear in the live node list |
+| I/O scheduler | /sys/block/{mmcblk[0-9]+, sd[a-c], nvme[0-9]+n[0-9]+}/queue/scheduler | Whole physical devices only; selected value must appear in the live node list |
 | VM | /proc/sys/vm/swappiness, /proc/sys/vm/vfs_cache_pressure | swappiness 0–100; cache pressure 10–200 |
 | TCP congestion | /proc/sys/net/ipv4/tcp_congestion_control | Selected algorithm must be in the live available list |
 | Battery | Android battery sticky broadcast | Read-only |
@@ -113,6 +113,10 @@ The Settings page is opened from the gear icon in the upper-right header. It man
 
 UI preferences are stored locally with Android SharedPreferences.
 
+The root view applies status-bar, navigation-bar and display-cutout insets from WindowInsets. This keeps the header and bottom navigation inside the device's safe display area.
+
+Overview and Monitor use bound TextViews for changing telemetry values. Snapshot updates are coalesced with postOnAnimation; the view tree is rebuilt only when the discovered device structure changes.
+
 ## SmartPack reference
 
 The archived SmartPack Kernel Manager repository was reviewed for its capability-driven feature organization and kernel-manager concepts. The implementation in this repository was written independently; no SmartPack source file was copied.
@@ -136,7 +140,9 @@ Future writable interfaces require a documented path allow-list, value bounds, r
 
 ## Refresh behavior
 
-The activity performs root preflight once during startup. Telemetry runs on a single background executor and refreshes only while the activity is resumed. The interval can be set to 5, 8, 15 or 30 seconds. This is not a persistent background monitoring service.
+The activity performs root preflight once during startup. All sysfs/procfs reads, SU commands, control writes, log retrieval and SU session cleanup run on a dedicated single-thread I/O executor; no kernel I/O is performed on the UI thread. Serial execution also protects the persistent SU stream from concurrent readers and writers.
+
+Telemetry refreshes only while the activity is resumed. The interval can be set to 5, 8, 15 or 30 seconds. A completed snapshot is posted to the UI thread, coalesced to the next display frame and applied to existing value views. This is not a persistent background monitoring service.
 
 ## Build
 
