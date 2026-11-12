@@ -296,9 +296,7 @@ class KernelRepository(
 
     fun applySchedutilTunable(tunablesPath: String, tunable: String, value: String): ControlResult {
         if (!rootAccess().available) return ControlResult(false, "Root permission is required.")
-        val pathAllowed = Regex(
-            "^/sys/devices/system/cpu/(cpufreq/policy[0-9]+/schedutil|cpu[0-7]/cpufreq/schedutil|cpufreq/schedutil)$"
-        ).matches(tunablesPath)
+        val pathAllowed = KernelParsers.isSupportedSchedutilTunablesPath(tunablesPath)
         if (!pathAllowed) return ControlResult(false, "Rejected unknown schedutil tunables path.")
 
         val policies = discoverCpuPolicies().filter { it.governor == "schedutil" }
