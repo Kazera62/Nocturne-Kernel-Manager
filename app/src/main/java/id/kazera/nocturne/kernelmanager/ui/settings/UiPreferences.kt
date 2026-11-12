@@ -313,6 +313,7 @@ object UiText {
         "Thermal and voltage controls remain kernel-managed." to "Kontrol termal dan tegangan tetap dikelola kernel.",
         "GPU power-level read-back failed; previous limit was restored where possible." to "Baca ulang power level GPU gagal; batas sebelumnya dipulihkan bila memungkinkan.",
         "CPU0 protected" to "CPU0 dilindungi",
+        "Core 0" to "Core 0",
         "Protected" to "Dilindungi",
         "CPU hotplug interface" to "Interface hotplug CPU",
         "At least two cores must remain online. Runtime-only control." to "Minimal dua core harus tetap aktif. Kontrol hanya berlaku selama sesi berjalan.",
