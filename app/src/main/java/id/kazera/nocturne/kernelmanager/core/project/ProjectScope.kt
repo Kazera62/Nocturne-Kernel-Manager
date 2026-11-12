@@ -18,7 +18,9 @@ object ProjectScope {
     const val VM_CONTROLS_ENABLED = true
     const val TCP_CONGESTION_CONTROL_ENABLED = true
 
-    const val GPU_WRITE_CONTROLS_ENABLED = false
+    const val GPU_WRITE_CONTROLS_ENABLED = true
+    const val GPU_MAX_POWER_LEVEL_CONTROL_ENABLED = true
+    const val GPU_OPP_TABLE_WRITES_ENABLED = false
     const val VOLTAGE_CONTROLS_ENABLED = false
     const val THERMAL_LIMIT_CONTROLS_ENABLED = false
     const val DDR_OVERCLOCK_CONTROLS_ENABLED = false
