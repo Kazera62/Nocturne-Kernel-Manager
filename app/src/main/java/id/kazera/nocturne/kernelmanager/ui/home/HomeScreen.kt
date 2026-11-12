@@ -35,7 +35,9 @@ class HomeScreen(
     private val onRootRefresh: () -> Unit,
     private val onLanguageChanged: (String) -> Unit,
     private val onRefreshIntervalChanged: (Int) -> Unit,
-    private val onGpuMaximumFrequencyApply: (Long) -> Unit
+    private val onGpuMaximumFrequencyApply: (Long) -> Unit,
+    private val onCpuCoreToggle: (Int, Boolean) -> Unit,
+    private val onDevfreqRangeApply: (String, Long, Long) -> Unit
 ) : LinearLayout(context) {
 
     private enum class Page(val label: String, val icon: String) {
@@ -698,25 +700,82 @@ class HomeScreen(
             )
         }
 
-        addCard(container, "CCI / DDR DEVFREQ") {
-            if (data.devfreq.isEmpty()) {
-                addUnsupported(it, "No supported CCI/DDR devfreq node found.")
+        addCard(container, "CPU CORE HOTPLUG", "CPU0 protected") { card ->
+            if (data.cpuCores.isEmpty()) {
+                addUnsupported(card, "CPU core topology")
             } else {
-                data.devfreq.forEach { item ->
-                    addText(it, item.name, SECONDARY, 12f, bold = true, top = 8)
-                    addInfoRow(it, "Current frequency", DeviceInfo.frequencyHz(item.currentFrequencyHz))
-                    addInfoRow(it, "Minimum exposed", item.minimumFrequencyHz?.let { value -> DeviceInfo.frequencyHz(value) } ?: "Unsupported")
-                    addInfoRow(it, "Maximum exposed", item.maximumFrequencyHz?.let { value -> DeviceInfo.frequencyHz(value) } ?: "Unsupported")
-                    addInfoRow(it, "Available OPP entries", item.availableFrequenciesHz.size.toString())
+                addInfoRow(card, "Core 0", "Protected")
+                val controllable = data.cpuCores.filter {
+                    KernelParsers.isSupportedCpuHotplugCore(it.coreId) && it.online != null
+                }
+                if (controllable.isEmpty()) {
+                    addUnsupported(card, "CPU hotplug interface")
+                } else {
+                    controllable.forEach { core ->
+                        addLiveSwitchRow(
+                            card,
+                            "Core " + core.coreId,
+                            core.online == true,
+                            data.root.available,
+                            onChanged = { enabled -> onCpuCoreToggle(core.coreId, enabled) },
+                            valueProvider = { current ->
+                                current.cpuCores.firstOrNull { it.coreId == core.coreId }?.online
+                            }
+                        )
+                    }
                 }
             }
-            addText(
-                it,
-                "This kernel build exposes no verified generic CCI/DDR write adapter. These nodes remain read-only; kernel-managed bandwidth boosts are untouched.",
-                MUTED,
-                11f,
-                top = 8
-            )
+            addText(card, "At least two cores must remain online. Runtime-only control.",
+                MUTED, 11f, top = 8)
+        }
+
+        addCard(container, "CCI / DDR DEVFREQ", "Live fabric frequency limits") { card ->
+            if (data.devfreq.isEmpty()) {
+                addUnsupported(card, "No supported CCI/DDR devfreq node found.")
+            } else {
+                data.devfreq.forEach { item ->
+                    addText(card, item.name, SECONDARY, 12f, bold = true, top = 8)
+                    addLiveInfoRow(card, "Current frequency", DeviceInfo.frequencyHz(item.currentFrequencyHz)) { current ->
+                        DeviceInfo.frequencyHz(current.devfreq.firstOrNull { entry -> entry.path == item.path }?.currentFrequencyHz)
+                    }
+                    addInfoRow(card, "Minimum exposed", item.minimumFrequencyHz?.let { value -> DeviceInfo.frequencyHz(value) } ?: "Unsupported")
+                    addInfoRow(card, "Maximum exposed", item.maximumFrequencyHz?.let { value -> DeviceInfo.frequencyHz(value) } ?: "Unsupported")
+                    addInfoRow(card, "Available OPP entries", item.availableFrequenciesHz.size.toString())
+
+                    val values = item.availableFrequenciesHz.distinct().sorted()
+                    val currentMin = item.minimumFrequencyHz
+                    val currentMax = item.maximumFrequencyHz
+                    val writable = values.isNotEmpty() && currentMin != null && currentMax != null &&
+                        currentMin in values && currentMax in values
+                    if (writable) {
+                        val options = values.map { "$it Hz" }
+                        addText(card, "Minimum frequency", SECONDARY, 12f, bold = true, top = 7)
+                        val minPicker = spinner(options, "$currentMin Hz")
+                        card.addView(minPicker, LayoutParams(MATCH_PARENT, dp(44)))
+                        addText(card, "Maximum frequency", SECONDARY, 12f, bold = true, top = 7)
+                        val maxPicker = spinner(options, "$currentMax Hz")
+                        card.addView(maxPicker, LayoutParams(MATCH_PARENT, dp(44)))
+                        card.addView(
+                            actionButton("Apply fabric limits", "Apply CCI and DDR frequency limits") {
+                                val minimum = minPicker.selectedItem?.toString()?.substringBefore(" ")?.toLongOrNull()
+                                val maximum = maxPicker.selectedItem?.toString()?.substringBefore(" ")?.toLongOrNull()
+                                if (!data.root.available) toast("Root permission is required.")
+                                else if (minimum == null || maximum == null || minimum > maximum) {
+                                    toast("Invalid devfreq range.")
+                                } else {
+                                    onDevfreqRangeApply(item.path, minimum, maximum)
+                                }
+                            },
+                            LayoutParams(MATCH_PARENT, dp(44)).apply { topMargin = dp(8) }
+                        )
+                    } else {
+                        addText(card, "No writable min_freq/max_freq pair. Telemetry only.",
+                            MUTED, 11f, top = 7)
+                    }
+                }
+            }
+            addText(card, "Only live frequencies are selectable. Kernel-managed bandwidth boosts remain untouched.",
+                MUTED, 11f, top = 8)
         }
 
         addCard(container, "VOLTAGE / CPR") {
@@ -1126,6 +1185,48 @@ class HomeScreen(
             LayoutParams(WRAP_CONTENT, WRAP_CONTENT)
         )
         parent.addView(row, LayoutParams(MATCH_PARENT, WRAP_CONTENT))
+    }
+
+    private fun addLiveSwitchRow(
+        parent: LinearLayout,
+        label: String,
+        initialChecked: Boolean,
+        enabled: Boolean,
+        onChanged: (Boolean) -> Unit,
+        valueProvider: (DeviceSnapshot) -> Boolean?
+    ) {
+        val row = LinearLayout(context).apply {
+            orientation = HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, dp(6), 0, dp(6))
+        }
+        row.addView(
+            TextView(context).apply {
+                text = t(label)
+                textSize = 12f
+                setTextColor(SECONDARY)
+            },
+            LayoutParams(0, WRAP_CONTENT, 1f)
+        )
+        var bindingSnapshot = false
+        val toggle = Switch(context).apply {
+            isChecked = initialChecked
+            isEnabled = enabled
+            setOnCheckedChangeListener { _, checked ->
+                if (!bindingSnapshot) onChanged(checked)
+            }
+        }
+        row.addView(toggle, LayoutParams(WRAP_CONTENT, WRAP_CONTENT))
+        parent.addView(row, LayoutParams(MATCH_PARENT, WRAP_CONTENT))
+        liveBindings += { current ->
+            valueProvider(current)?.let { checked ->
+                if (toggle.isChecked != checked) {
+                    bindingSnapshot = true
+                    toggle.isChecked = checked
+                    bindingSnapshot = false
+                }
+            }
+        }
     }
 
     private fun addLiveInfoRow(
