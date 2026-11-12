@@ -774,7 +774,26 @@ class HomeScreen(
                         addSchedutilRateControl(card, item.path, "down_rate_limit_us", "Down rate limit", current, data.root.available)
                     }
                     item.powerLimitEnabled?.let { enabled ->
-                        addInfoRow(card, "PL flag", if (enabled) "Enabled" else "Disabled")
+                        val row = LinearLayout(context).apply {
+                            orientation = HORIZONTAL
+                            gravity = Gravity.CENTER_VERTICAL
+                        }
+                        val labels = LinearLayout(context).apply { orientation = VERTICAL }
+                        addText(labels, "WALT PL utilization", TEXT, 13f, bold = true)
+                        addText(labels, "Include PL contribution in schedutil demand.", MUTED, 11f, top = 3)
+                        row.addView(labels, LayoutParams(0, WRAP_CONTENT, 1f))
+                        val toggle = Switch(context).apply {
+                            isChecked = enabled
+                            isEnabled = data.root.available
+                            contentDescription = t("WALT PL utilization")
+                            setOnCheckedChangeListener { _, checked ->
+                                onSchedutilTunableApply(item.path, "pl", if (checked) "1" else "0")
+                            }
+                        }
+                        row.addView(toggle, LayoutParams(WRAP_CONTENT, WRAP_CONTENT))
+                        card.addView(row, LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply {
+                            topMargin = dp(8)
+                        })
                     }
                 }
             }
@@ -791,6 +810,13 @@ class HomeScreen(
                 WARNING,
                 11f,
                 top = 7
+            )
+            addText(
+                card,
+                "WALT PL controls whether PL utilization contributes to schedutil demand. Disabling it can change boost response and workload performance.",
+                MUTED,
+                11f,
+                top = 6
             )
         }
 
