@@ -23,7 +23,7 @@
 - CPU/GPU voltage and CPR remain read-only; no runtime undervolt interface is exposed.
 - CCI/DDR bounds are writable only for discovered fabric nodes and exact live OPP values; regulator, thermal policy and DDR bandwidth boost controls remain read-only.
 - Higher GPU limits can increase heat and power and may cause artifacts, freezes, reboots or data loss.
-- Schedutil changes can affect latency, responsiveness, power use and thermal behavior.
+- Schedutil changes can affect ramp-up/ramp-down latency, responsiveness, boost activity, power use and thermal behavior.
 - Dynamic Fsync may defer fsync/fdatasync; a crash or forced power loss before deferred writes complete can lose recent data or corrupt the filesystem.
 
 ## [0.3.0] - 2026-11-12
