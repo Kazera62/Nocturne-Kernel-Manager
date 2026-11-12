@@ -22,7 +22,11 @@ data class GpuInfo(
     val currentFrequencyHz: Long?,
     val utilizationPercent: Int?,
     val availableFrequenciesHz: List<Long>,
-    val source: String?
+    val source: String?,
+    val maximumPowerLevel: Int? = null,
+    val minimumPowerLevel: Int? = null,
+    val numberOfPowerLevels: Int? = null,
+    val maximumClockHz: Long? = null
 )
 
 data class DevfreqInfo(
@@ -30,7 +34,9 @@ data class DevfreqInfo(
     val path: String,
     val currentFrequencyHz: Long?,
     val governor: String?,
-    val availableFrequenciesHz: List<Long>
+    val availableFrequenciesHz: List<Long>,
+    val minimumFrequencyHz: Long? = null,
+    val maximumFrequencyHz: Long? = null
 )
 
 data class ThermalSensor(
