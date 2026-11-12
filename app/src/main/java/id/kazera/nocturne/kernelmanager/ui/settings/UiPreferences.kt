@@ -136,7 +136,7 @@ object UiText {
         "Available governor list" to "Daftar governor yang tersedia",
         "Grant root access to apply changes." to "Berikan izin root untuk menerapkan perubahan.",
         "Control boundary" to "Batas kontrol",
-        "Frequencies are validated against live OPPs. Failed writes restore previous limits; voltage nodes stay untouched." to "Frekuensi divalidasi terhadap OPP aktif. Jika gagal, batas sebelumnya dipulihkan; node tegangan tidak diubah.",
+        "Live OPP validation. Failed writes restore limits; voltage nodes are untouched." to "Validasi OPP aktif. Batas dipulihkan saat gagal; node tegangan tidak diubah.",
         "GPU telemetry" to "Telemetry GPU",
         "GPU and devfreq telemetry (read-only)." to "Telemetry GPU dan devfreq (hanya-baca).",
         "GPU STATUS" to "STATUS GPU",
