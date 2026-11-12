@@ -450,7 +450,7 @@ class HomeScreen(
             }
             val labels = LinearLayout(context).apply { orientation = VERTICAL }
             addText(labels, "Enable advanced controls", TEXT, 13f, bold = true)
-            addText(labels, "GPU OPP limits and kernel telemetry.", MUTED, 11f, top = 3)
+            addText(labels, "GPU OPP, CPU governor and fsync controls.", MUTED, 11f, top = 3)
             row.addView(labels, LayoutParams(0, WRAP_CONTENT, 1f))
             val toggle = Switch(context).apply {
                 isChecked = UiPreferences.advancedMenuEnabled(context)
@@ -784,6 +784,13 @@ class HomeScreen(
                 MUTED,
                 11f,
                 top = 8
+            )
+            addText(
+                card,
+                "Risk: raising hispeed frequency or lowering hispeed load can increase boost activity, power draw and heat. Extreme rate limits may cause sluggish response or frequent frequency changes.",
+                WARNING,
+                11f,
+                top = 7
             )
         }
 
