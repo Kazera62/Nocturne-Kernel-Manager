@@ -294,34 +294,41 @@ class KernelRepository(
         return ControlResult(true, "CPU$coreId is now " + if (online) "online." else "offline.")
     }
 
-    fun applySchedutilTunable(policyPath: String, tunable: String, value: String): ControlResult {
+    fun applySchedutilTunable(tunablesPath: String, tunable: String, value: String): ControlResult {
         if (!rootAccess().available) return ControlResult(false, "Root permission is required.")
-        if (!Regex("^/sys/devices/system/cpu/(cpufreq/policy[0-9]+|cpu[0-7]/cpufreq)$").matches(policyPath)) {
-            return ControlResult(false, "Rejected unknown CPU policy path.")
-        }
-        val policy = discoverCpuPolicies().firstOrNull { it.path == policyPath }
-            ?: return ControlResult(false, "CPU policy is no longer available.")
-        if (policy.governor != "schedutil") {
-            return ControlResult(false, "The policy is not using schedutil.")
-        }
+        val pathAllowed = Regex(
+            "^/sys/devices/system/cpu/(cpufreq/policy[0-9]+/schedutil|cpu[0-7]/cpufreq/schedutil|cpufreq/schedutil)$"
+        ).matches(tunablesPath)
+        if (!pathAllowed) return ControlResult(false, "Rejected unknown schedutil tunables path.")
+
+        val policies = discoverCpuPolicies().filter { it.governor == "schedutil" }
+        if (policies.isEmpty()) return ControlResult(false, "No active schedutil CPU policy found.")
+        val activeTunables = discoverAdvancedKernel(policies)
+            .schedutilTunables.firstOrNull { it.path == tunablesPath }
+            ?: return ControlResult(false, "Schedutil tunables are no longer available.")
 
         val numeric = value.toLongOrNull()
             ?: return ControlResult(false, "Invalid schedutil value.")
-        if (!KernelParsers.isValidSchedutilTunable(tunable, numeric, policy.availableFrequenciesKHz)) {
+        val frequencies = if (tunablesPath == "/sys/devices/system/cpu/cpufreq/schedutil") {
+            policies.map { it.availableFrequenciesKHz }.reduceOrNull { acc, list -> acc.intersect(list.toSet()).toList() }.orEmpty()
+        } else {
+            policies.firstOrNull { it.path == activeTunables.policyPath }?.availableFrequenciesKHz.orEmpty()
+        }
+        if (!KernelParsers.isValidSchedutilTunable(tunable, numeric, frequencies)) {
             return ControlResult(false, "Schedutil value is outside the supported range.")
         }
 
-        val path = "$policyPath/schedutil/$tunable"
+        val path = "$tunablesPath/$tunable"
         val oldValue = read(path)?.trim()
             ?: return ControlResult(false, "Schedutil tunable is not exposed by this kernel.")
         if (oldValue == value) return ControlResult(true, "Schedutil tunable is already set.")
 
-        val write = rootShell.writeSchedutilTunable(policyPath, tunable, value)
+        val write = rootShell.writeSchedutilTunable(tunablesPath, tunable, value)
         if (!write.success) {
             return ControlResult(false, write.error ?: "Schedutil update failed.")
         }
         if (read(path)?.trim() != value) {
-            rootShell.writeSchedutilTunable(policyPath, tunable, oldValue)
+            rootShell.writeSchedutilTunable(tunablesPath, tunable, oldValue)
             return ControlResult(false, "Schedutil read-back failed; previous value was restored where possible.")
         }
         return ControlResult(true, "Schedutil tunable updated for this boot session.")
@@ -681,10 +688,17 @@ class KernelRepository(
     }
 
     private fun discoverAdvancedKernel(cpuPolicies: List<CpuPolicyInfo>): AdvancedKernelInfo {
-        val schedutilTunables = cpuPolicies.mapNotNull { policy ->
-            if (policy.governor != "schedutil") return@mapNotNull null
+        val schedutilPolicies = cpuPolicies.filter { it.governor == "schedutil" }
+        val schedutilTunables = schedutilPolicies.mapNotNull { policy ->
+            val candidatePaths = listOf(
+                policy.path + "/schedutil",
+                "/sys/devices/system/cpu/cpufreq/schedutil"
+            ).distinct()
+            val path = candidatePaths.firstOrNull { candidate ->
+                listOf("hispeed_load", "hispeed_freq", "up_rate_limit_us", "down_rate_limit_us", "pl")
+                    .any { tunable -> !read("$candidate/$tunable").isNullOrBlank() }
+            } ?: return@mapNotNull null
 
-            val path = policy.path + "/schedutil"
             val hispeedLoad = read("$path/hispeed_load")?.toIntOrNull()
             val hispeedFrequency = read("$path/hispeed_freq")?.toLongOrNull()
             val upRate = read("$path/up_rate_limit_us")?.toLongOrNull()
