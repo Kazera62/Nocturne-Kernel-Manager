@@ -253,15 +253,25 @@ class HomeScreen(
                     MUTED, 11f, top = 10)
             } else if (policy.availableGovernors.isNotEmpty()) {
                 addText(card, "Governor", SECONDARY, 12f, bold = true, top = 12)
-                val governorSpinner = spinner(policy.availableGovernors, policy.governor)
+                val governorOptions = if (policy.governor in policy.availableGovernors) {
+                    policy.availableGovernors
+                } else {
+                    listOf("Keep current") + policy.availableGovernors
+                }
+                val governorSpinner = spinner(governorOptions, policy.governor ?: "Keep current")
                 card.addView(governorSpinner, LayoutParams(MATCH_PARENT, dp(46)))
+
                 val frequencies = policy.availableFrequenciesKHz
-                if (frequencies.isNotEmpty()) {
+                val currentMin = policy.minFrequencyKHz
+                val currentMax = policy.maxFrequencyKHz
+                val currentBoundsAreValid = currentMin != null && currentMax != null &&
+                    currentMin in frequencies && currentMax in frequencies
+                if (frequencies.isNotEmpty() && currentBoundsAreValid) {
                     addText(card, "Minimum frequency", SECONDARY, 12f, bold = true, top = 8)
-                    val minSpinner = frequencySpinner(frequencies, policy.minFrequencyKHz ?: frequencies.first())
+                    val minSpinner = frequencySpinner(frequencies, currentMin!!)
                     card.addView(minSpinner, LayoutParams(MATCH_PARENT, dp(46)))
                     addText(card, "Maximum frequency", SECONDARY, 12f, bold = true, top = 8)
-                    val maxSpinner = frequencySpinner(frequencies, policy.maxFrequencyKHz ?: frequencies.last())
+                    val maxSpinner = frequencySpinner(frequencies, currentMax!!)
                     card.addView(maxSpinner, LayoutParams(MATCH_PARENT, dp(46)))
                     card.addView(
                         actionButton("Apply CPU settings", "Apply governor and limits") {
@@ -270,14 +280,19 @@ class HomeScreen(
                             } else {
                                 val min = selectedFrequency(minSpinner)
                                 val max = selectedFrequency(maxSpinner)
-                                if (min == null || max == null) toast("Kernel frequency values are unavailable.")
-                                else onCpuApply(policy, governorSpinner.selectedItem?.toString(), min, max)
+                                val selectedGovernor = governorSpinner.selectedItem?.toString()
+                                    ?.takeIf { it != "Keep current" }
+                                if (min == null || max == null) {
+                                    toast("Kernel frequency values are unavailable.")
+                                } else {
+                                    onCpuApply(policy, selectedGovernor, min, max)
+                                }
                             }
                         },
                         LayoutParams(MATCH_PARENT, dp(46)).apply { topMargin = dp(12) }
                     )
                 } else {
-                    addText(card, "Frequency table unsupported; frequency controls are hidden until valid OPP values are exposed.",
+                    addText(card, "Frequency controls hidden because current min/max are missing or do not match the live OPP table.",
                         MUTED, 11f, top = 8)
                 }
             } else {
@@ -402,12 +417,19 @@ class HomeScreen(
                 addCard(container, scheduler.deviceName, scheduler.path) { card ->
                     addInfoRow(card, "Active scheduler", scheduler.activeScheduler ?: "Unknown")
                     addInfoRow(card, "Available", scheduler.availableSchedulers.joinToString(", "))
-                    val picker = spinner(scheduler.availableSchedulers, scheduler.activeScheduler)
+                    val schedulerOptions = if (scheduler.activeScheduler in scheduler.availableSchedulers) {
+                        scheduler.availableSchedulers
+                    } else {
+                        listOf("Keep current") + scheduler.availableSchedulers
+                    }
+                    val picker = spinner(schedulerOptions, scheduler.activeScheduler ?: "Keep current")
                     card.addView(picker, LayoutParams(MATCH_PARENT, dp(46)))
                     card.addView(
                         actionButton("Apply scheduler", "Apply I/O scheduler") {
                             if (!data.root.available) toast("Root permission is required.")
-                            else picker.selectedItem?.toString()?.let { onIoApply(scheduler, it) }
+                            else picker.selectedItem?.toString()
+                                ?.takeIf { it != "Keep current" }
+                                ?.let { onIoApply(scheduler, it) }
                         },
                         LayoutParams(MATCH_PARENT, dp(46)).apply { topMargin = dp(10) }
                     )
@@ -448,11 +470,18 @@ class HomeScreen(
             addText(it, "TCP congestion control", SECONDARY, 12f, bold = true, top = 12)
             addInfoRow(it, "Current algorithm", data.tcpCongestionControl ?: "Unsupported")
             if (data.availableTcpCongestionControls.isNotEmpty()) {
-                val picker = spinner(data.availableTcpCongestionControls, data.tcpCongestionControl)
+                val tcpOptions = if (data.tcpCongestionControl in data.availableTcpCongestionControls) {
+                    data.availableTcpCongestionControls
+                } else {
+                    listOf("Keep current") + data.availableTcpCongestionControls
+                }
+                val picker = spinner(tcpOptions, data.tcpCongestionControl ?: "Keep current")
                 it.addView(picker, LayoutParams(MATCH_PARENT, dp(46)))
                 cardButton(it, "Apply TCP algorithm") {
                     if (!data.root.available) toast("Root permission is required.")
-                    else picker.selectedItem?.toString()?.let { selected -> onTcpApply(selected) }
+                    else picker.selectedItem?.toString()
+                        ?.takeIf { selected -> selected != "Keep current" }
+                        ?.let { selected -> onTcpApply(selected) }
                 }
             } else {
                 addUnsupported(it, "Available TCP congestion algorithms")
