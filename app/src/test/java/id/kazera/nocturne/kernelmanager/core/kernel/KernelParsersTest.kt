@@ -22,6 +22,20 @@ class KernelParsersTest {
     }
 
     @Test
+    fun validatesSchedutilTunablesAgainstKnownBounds() {
+        val frequencies = listOf(300_000L, 576_000L, 1_200_000L)
+        assertEquals(true, KernelParsers.isValidSchedutilTunable("hispeed_load", 0, frequencies))
+        assertEquals(true, KernelParsers.isValidSchedutilTunable("hispeed_load", 100, frequencies))
+        assertEquals(false, KernelParsers.isValidSchedutilTunable("hispeed_load", 101, frequencies))
+        assertEquals(true, KernelParsers.isValidSchedutilTunable("hispeed_freq", 576_000, frequencies))
+        assertEquals(false, KernelParsers.isValidSchedutilTunable("hispeed_freq", 500_000, frequencies))
+        assertEquals(true, KernelParsers.isValidSchedutilTunable("up_rate_limit_us", 1_000_000, frequencies))
+        assertEquals(false, KernelParsers.isValidSchedutilTunable("down_rate_limit_us", 1_000_001, frequencies))
+        assertEquals(true, KernelParsers.isValidSchedutilTunable("pl", 1, frequencies))
+        assertEquals(false, KernelParsers.isValidSchedutilTunable("unknown", 0, frequencies))
+    }
+
+    @Test
     fun mapsKgslFrequenciesToDescendingPowerLevels() {
         val frequencies = listOf(133_300_000L, 216_000_000L, 400_000_000L, 650_000_000L, 824_000_000L)
         assertEquals(0, KernelParsers.gpuPowerLevelForFrequency(frequencies, 824_000_000L))
