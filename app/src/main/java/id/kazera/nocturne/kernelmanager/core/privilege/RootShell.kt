@@ -200,27 +200,36 @@ class RootShell : AutoCloseable {
     }
 
     private fun clearSession(destroy: Boolean) {
-        try {
-            output?.close()
-        } catch (_: Exception) {
-            // Session is already closed.
-        }
-        try {
-            input?.close()
-        } catch (_: Exception) {
-            // Session is already closed.
-        }
+        val oldProcess = process
+        val oldInput = input
+        val oldOutput = output
+
+        // Detach the active references first so no new command can reuse this session.
+        process = null
+        input = null
+        output = null
+
+        // Kill first: closing a reader while another thread is blocked in readLine()
+        // can itself block. Process termination unblocks that reader.
         if (destroy) {
             try {
-                process?.destroyForcibly()
-                process?.waitFor(250, TimeUnit.MILLISECONDS)
+                oldProcess?.destroyForcibly()
+                oldProcess?.waitFor(250, TimeUnit.MILLISECONDS)
             } catch (_: Exception) {
                 // The process may already have exited.
             }
         }
-        process = null
-        input = null
-        output = null
+
+        try {
+            oldOutput?.close()
+        } catch (_: Exception) {
+            // Session is already closed.
+        }
+        try {
+            oldInput?.close()
+        } catch (_: Exception) {
+            // Session is already closed.
+        }
     }
 
     fun invalidate() {
