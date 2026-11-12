@@ -246,7 +246,12 @@ class HomeScreen(
             addInfoRow(card, "Current maximum", DeviceInfo.frequency(policy.maxFrequencyKHz))
             addInfoRow(card, "Available OPP entries", policy.availableFrequenciesKHz.size.toString())
 
-            if (policy.availableGovernors.isNotEmpty()) {
+            val writablePolicyPath =
+                Regex("^/sys/devices/system/cpu/cpufreq/policy[0-9]+$").matches(policy.path)
+            if (!writablePolicyPath) {
+                addText(card, "This policy uses a non-standard path. Telemetry is read-only for safety.",
+                    MUTED, 11f, top = 10)
+            } else if (policy.availableGovernors.isNotEmpty()) {
                 addText(card, "Governor", SECONDARY, 12f, bold = true, top = 12)
                 val governorSpinner = spinner(policy.availableGovernors, policy.governor)
                 card.addView(governorSpinner, LayoutParams(MATCH_PARENT, dp(46)))
@@ -429,8 +434,10 @@ class HomeScreen(
         addCard(container, "STORAGE") {
             addInfoRow(it, "Data partition total", DeviceInfo.bytes(data.storage.totalBytes))
             addInfoRow(it, "Available", DeviceInfo.bytes(data.storage.availableBytes))
-            val percent = if (data.storage.totalBytes > 0L) {
-                ((data.storage.availableBytes * 100L) / data.storage.totalBytes).toInt().coerceIn(0, 100)
+            val totalBytes = data.storage.totalBytes
+            val availableBytes = data.storage.availableBytes
+            val percent = if (totalBytes != null && availableBytes != null && totalBytes > 0L) {
+                ((availableBytes * 100L) / totalBytes).toInt().coerceIn(0, 100)
             } else null
             addInfoRow(it, "Available space", percent?.let { value -> "$value%" } ?: "Unsupported")
         }
