@@ -419,7 +419,7 @@ class HomeScreen(
             addText(card, "Nocturne Kernel Manager", TEXT, 15f, bold = true)
             addText(card, "Target: Samsung Galaxy M11 / A11 · SDM450", SECONDARY, 12f, top = 5)
             addText(card, "Version 0.3.0", MUTED, 11f, top = 5)
-            addText(card, "Inspired by established kernel-manager concepts. Hardware controls are exposed only when validated interfaces are present.",
+            addText(card, "Hardware controls require validated kernel interfaces.",
                 MUTED, 11f, top = 9)
         }
     }
@@ -442,7 +442,7 @@ class HomeScreen(
         }
 
     private fun renderCpu(container: LinearLayout, data: DeviceSnapshot) {
-        addPageHeading(container, "CPU controls", "Only values exposed by each cpufreq policy are selectable.")
+        addPageHeading(container, "CPU controls", "Select an available frequency.")
         if (!data.root.available) addRootRequired(container)
         if (data.cpuPolicies.isEmpty()) {
             addCard(container, "CPU interface unavailable") { addUnsupported(it, "No readable cpufreq policy was found.") }
@@ -469,7 +469,7 @@ class HomeScreen(
                 MUTED, 11f, top = 8)
         }
         addCard(container, "Control boundary") {
-            addText(it, "Frequency values are loaded from the active kernel OPP table. The app rejects values outside that table and restores previous limits when a write fails. No voltage or regulator node is modified.",
+            addText(it, "Frequencies are validated against live OPPs. Failed writes restore previous limits; voltage nodes stay untouched.",
                 SECONDARY, 12f)
         }
     }
@@ -787,7 +787,7 @@ class HomeScreen(
 
     private fun addRootRequired(container: LinearLayout) {
         addCard(container, "Root access required") {
-            addText(it, "Read-only values remain available where Android permits. Grant root through your installed root manager to apply supported controls.",
+            addText(it, "Root is required for write controls. Telemetry remains read-only without root.",
                 WARNING, 12f)
         }
     }
