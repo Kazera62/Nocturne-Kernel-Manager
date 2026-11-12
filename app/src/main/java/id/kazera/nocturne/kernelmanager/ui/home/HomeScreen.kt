@@ -135,7 +135,7 @@ class HomeScreen(
         append('|')
         append(data.advancedKernel.schedutilTunables.map {
             listOf(
-                it.policyPath, it.hispeedLoad, it.hispeedFrequencyKHz,
+                it.policyPath, it.path, it.hispeedLoad, it.hispeedFrequencyKHz,
                 it.upRateLimitUs, it.downRateLimitUs, it.powerLimitEnabled
             )
         })
@@ -745,7 +745,14 @@ class HomeScreen(
                             LayoutParams(MATCH_PARENT, dp(42)).apply { topMargin = dp(4) }
                         )
                     }
-                    val frequencies = policy?.availableFrequenciesKHz.orEmpty()
+                    val frequencies = if (item.path == "/sys/devices/system/cpu/cpufreq/schedutil") {
+                        data.cpuPolicies.filter { it.governor == "schedutil" }
+                            .map { it.availableFrequenciesKHz.toSet() }
+                            .reduceOrNull { acc, next -> acc intersect next }
+                            ?.toList()?.sorted().orEmpty()
+                    } else {
+                        policy?.availableFrequenciesKHz.orEmpty()
+                    }
                     item.hispeedFrequencyKHz?.takeIf { it in frequencies }?.let { current ->
                         addText(card, "Hispeed frequency", SECONDARY, 12f, bold = true, top = 9)
                         val picker = frequencySpinner(frequencies, current)
@@ -764,7 +771,7 @@ class HomeScreen(
                         addSchedutilRateControl(card, item.path, "up_rate_limit_us", "Up rate limit", current, data.root.available)
                     }
                     item.downRateLimitUs?.takeIf { it in 0L..1_000_000L }?.let { current ->
-                        addSchedutilRateControl(card, item.policyPath, "down_rate_limit_us", "Down rate limit", current, data.root.available)
+                        addSchedutilRateControl(card, item.path, "down_rate_limit_us", "Down rate limit", current, data.root.available)
                     }
                     item.powerLimitEnabled?.let { enabled ->
                         addInfoRow(card, "PL flag", if (enabled) "Enabled" else "Disabled")
