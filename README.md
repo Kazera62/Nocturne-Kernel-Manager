@@ -38,7 +38,7 @@ The navigation is divided into four main areas:
 
 The gear icon in the top-right opens **Settings**. Language and refresh preferences are stored locally.
 
-The layout applies dynamic status-bar, navigation-bar and display-cutout insets. Kernel telemetry and all SU commands run on a dedicated background I/O executor. Overview and Monitor update bound values on the next display frame rather than rebuilding the full view tree on every poll.
+The layout applies dynamic status-bar, navigation-bar and display-cutout insets. Kernel telemetry and all SU commands run on a dedicated background I/O executor. Overview, Performance, Monitor and System update bound values on the next display frame rather than rebuilding the full view tree on every poll.
 
 ## Root startup flow
 
