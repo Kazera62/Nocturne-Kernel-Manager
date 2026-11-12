@@ -2,6 +2,11 @@ package id.kazera.nocturne.kernelmanager.domain.model
 
 import id.kazera.nocturne.kernelmanager.core.privilege.RootAccess
 
+data class CpuCoreInfo(
+    val coreId: Int,
+    val online: Boolean?
+)
+
 data class CpuPolicyInfo(
     val path: String,
     val name: String,
@@ -88,6 +93,7 @@ data class DeviceSnapshot(
     val kernelVersion: String,
     val uptimeSeconds: Long?,
     val root: RootAccess,
+    val cpuCores: List<CpuCoreInfo>,
     val cpuPolicies: List<CpuPolicyInfo>,
     val gpu: GpuInfo,
     val devfreq: List<DevfreqInfo>,
