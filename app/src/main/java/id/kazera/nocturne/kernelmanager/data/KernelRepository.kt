@@ -689,41 +689,42 @@ class KernelRepository(
 
     private fun discoverAdvancedKernel(cpuPolicies: List<CpuPolicyInfo>): AdvancedKernelInfo {
         val schedutilPolicies = cpuPolicies.filter { it.governor == "schedutil" }
-        val schedutilTunables = schedutilPolicies.mapNotNull { policy ->
+        val schedutilTunables = schedutilPolicies.flatMap { policy ->
             val candidatePaths = listOf(
                 policy.path + "/schedutil",
                 "/sys/devices/system/cpu/cpufreq/schedutil"
             ).distinct()
-            val path = candidatePaths.firstOrNull { candidate ->
+
+            candidatePaths.filter { candidate ->
                 listOf("hispeed_load", "hispeed_freq", "up_rate_limit_us", "down_rate_limit_us", "pl")
                     .any { tunable -> !read("$candidate/$tunable").isNullOrBlank() }
-            } ?: return@mapNotNull null
-
-            val hispeedLoad = read("$path/hispeed_load")?.toIntOrNull()
-            val hispeedFrequency = read("$path/hispeed_freq")?.toLongOrNull()
-            val upRate = read("$path/up_rate_limit_us")?.toLongOrNull()
-            val downRate = read("$path/down_rate_limit_us")?.toLongOrNull()
-            val powerLimit = read("$path/pl")?.let {
-                when (it.trim().lowercase()) {
-                    "1", "y", "yes", "true", "on" -> true
-                    "0", "n", "no", "false", "off" -> false
-                    else -> null
+            }.mapNotNull { path ->
+                val hispeedLoad = read("$path/hispeed_load")?.toIntOrNull()
+                val hispeedFrequency = read("$path/hispeed_freq")?.toLongOrNull()
+                val upRate = read("$path/up_rate_limit_us")?.toLongOrNull()
+                val downRate = read("$path/down_rate_limit_us")?.toLongOrNull()
+                val powerLimit = read("$path/pl")?.let {
+                    when (it.trim().lowercase()) {
+                        "1", "y", "yes", "true", "on" -> true
+                        "0", "n", "no", "false", "off" -> false
+                        else -> null
+                    }
                 }
-            }
 
-            if (hispeedLoad == null && hispeedFrequency == null && upRate == null &&
-                downRate == null && powerLimit == null) {
-                null
-            } else {
-                SchedutilTunablesInfo(
-                    policyPath = policy.path,
-                    path = path,
-                    hispeedLoad = hispeedLoad,
-                    hispeedFrequencyKHz = hispeedFrequency,
-                    upRateLimitUs = upRate,
-                    downRateLimitUs = downRate,
-                    powerLimitEnabled = powerLimit
-                )
+                if (hispeedLoad == null && hispeedFrequency == null && upRate == null &&
+                    downRate == null && powerLimit == null) {
+                    null
+                } else {
+                    SchedutilTunablesInfo(
+                        policyPath = policy.path,
+                        path = path,
+                        hispeedLoad = hispeedLoad,
+                        hispeedFrequencyKHz = hispeedFrequency,
+                        upRateLimitUs = upRate,
+                        downRateLimitUs = downRate,
+                        powerLimitEnabled = powerLimit
+                    )
+                }
             }
         }.distinctBy { it.path }
 
