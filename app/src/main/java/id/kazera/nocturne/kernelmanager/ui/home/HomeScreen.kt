@@ -339,7 +339,7 @@ class HomeScreen(
             val cachePressure = data.memory.vfsCachePressure
             addInfoRow(card, "Current swappiness", swappiness?.toString() ?: "Unsupported")
             addInfoRow(card, "Current VFS cache pressure", cachePressure?.toString() ?: "Unsupported")
-            if (swappiness in 0..100 && cachePressure in 10..200) {
+            if (swappiness != null && cachePressure != null && swappiness in 0..100 && cachePressure in 10..200) {
                 val swappinessBar = addSeekControl(card, "Swappiness", swappiness, 0, 100)
                 val cacheBar = addSeekControl(card, "VFS cache pressure", cachePressure, 10, 200)
                 card.addView(
