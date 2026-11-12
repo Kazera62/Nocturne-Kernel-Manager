@@ -151,8 +151,9 @@ class MainActivity : Activity() {
 
     override fun onDestroy() {
         mainHandler.removeCallbacksAndMessages(null)
-        ioExecutor.shutdownNow()
-        repository.closeRootSession()
+        // Close the persistent SU process off the UI thread as well.
+        ioExecutor.execute { repository.closeRootSession() }
+        ioExecutor.shutdown()
         super.onDestroy()
     }
 
