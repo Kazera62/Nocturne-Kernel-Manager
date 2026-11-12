@@ -81,6 +81,22 @@ class RootShell {
         return execute("dmesg | tail -n 160", timeoutMs = 5_000)
     }
 
+    fun writeVmSetting(setting: String, value: Int): ShellResult {
+        val target = when (setting) {
+            "swappiness" -> if (value in 0..100) "/proc/sys/vm/swappiness" else null
+            "vfs_cache_pressure" -> if (value in 10..200) "/proc/sys/vm/vfs_cache_pressure" else null
+            else -> null
+        } ?: return ShellResult(false, "", -1, "Rejected unsupported VM setting or value")
+        return writeNode(target, value.toString())
+    }
+
+    fun writeTcpCongestionControl(value: String): ShellResult {
+        if (!Regex("^[A-Za-z0-9_-]{1,32}$").matches(value)) {
+            return ShellResult(false, "", -1, "Rejected invalid TCP congestion control value")
+        }
+        return writeNode("/proc/sys/net/ipv4/tcp_congestion_control", value)
+    }
+
     private fun writeNode(path: String, value: String): ShellResult {
         // Both path and value are restricted by strict allow-lists above.
         return execute("printf '%s\\n' '$value' > '$path'", timeoutMs = 3_000)
