@@ -5,8 +5,10 @@
 ### Added
 - Optional Advanced kernel menu, disabled by default and enabled from Settings.
 - KGSL GPU maximum-OPP selection using the running kernel's live gpu_available_frequencies table.
+- Secondary CPU hotplug controls for present CPU IDs 1–7; CPU0 remains protected.
+- CCI/DDR min/max devfreq controls when writable bounds and a live available-frequency table are exposed.
 - Regulator voltage, limits and state telemetry where the regulator sysfs nodes are readable.
-- Runtime GPU OPP-to-max_pwrlevel mapping tests.
+- Runtime GPU OPP mapping and CPU hotplug target validation tests.
 
 ### Changed
 - Bump app version to 0.4.0 (versionCode 4).
@@ -17,7 +19,7 @@
 ### Safety
 - GPU control writes only KGSL max_pwrlevel; it does not add OPPs, change voltage, or modify thermal_pwrlevel.
 - CPU/GPU voltage and CPR remain read-only; no runtime undervolt interface is exposed.
-- CCI/DDR, regulator, thermal policy and DDR bandwidth controls remain read-only.
+- CCI/DDR bounds are writable only for discovered fabric nodes and exact live OPP values; regulator, thermal policy and DDR bandwidth boost controls remain read-only.
 - Higher GPU limits can increase heat and power and may cause artifacts, freezes, reboots or data loss.
 
 ## [0.3.0] - 2026-11-12
